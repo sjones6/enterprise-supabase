@@ -1,0 +1,7 @@
+{
+  "devDependencies": {
+    "react": "^18.2.0",
+    "supabase": "^1.82.6",
+    "typescript": "^5.1.6"
+  }
+}
