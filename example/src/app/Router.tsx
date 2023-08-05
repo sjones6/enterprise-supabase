@@ -5,7 +5,7 @@ import Root from "./Root";
 import Team from "./routes/team";
 import Lost from "./routes/404";
 import Login from "./routes/login";
-import ErrorBoundary from "@/components/ErrorBoundar";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const router = createBrowserRouter([
   {

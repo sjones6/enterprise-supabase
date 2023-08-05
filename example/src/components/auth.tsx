@@ -33,7 +33,7 @@ export const AuthProvider = ({ children }: PropsWithChildren<{}>) => {
 
     // listen for changes to auth
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (_event, session) => {
         setSession(session ?? null);
         setLoading(false);
       },
