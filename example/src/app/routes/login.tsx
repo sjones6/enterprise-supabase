@@ -9,7 +9,7 @@ function AuthUi() {
 
   useEffect(() => {
     if (auth.session) {
-      window.location.href = "/dashboard";
+      window.location.href = "/";
     }
   }, [auth]);
 

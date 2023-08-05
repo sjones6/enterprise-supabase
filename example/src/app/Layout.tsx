@@ -1,20 +1,9 @@
 import type { PropsWithChildren } from "react";
-import {
-  ChartPieIcon,
-  FolderIcon,
-  HomeIcon,
-  UserCircleIcon,
-  UsersIcon,
-} from "@heroicons/react/24/outline";
+import { HomeIcon, UserCircleIcon } from "@heroicons/react/24/outline";
 import { useAuth } from "@/components/auth";
 import { Link, useLocation } from "react-router-dom";
 
-const navigation = [
-  { name: "Home", href: "/dashboard", icon: HomeIcon, exact: true },
-  { name: "Team", href: "/dashboard/team", icon: UsersIcon },
-  { name: "Templates", href: "/dashboard/templates", icon: FolderIcon },
-  { name: "Analytics", href: "/dashboard/analytics", icon: ChartPieIcon },
-];
+const navigation = [{ name: "Home", href: "/", icon: HomeIcon, exact: true }];
 // const teams = [
 //   { id: 1, name: 'Heroicons', href: '#', initial: 'H', current: false },
 //   { id: 2, name: 'Tailwind Labs', href: '#', initial: 'T', current: false },
@@ -109,7 +98,7 @@ export default function Layout({
               {session.session && (
                 <li className="-mx-6 mt-auto">
                   <Link
-                    to="/dashboard/profile"
+                    to="/profile"
                     className="flex items-center gap-x-4 px-6 py-3 text-sm font-semibold leading-6 text-gray-900 hover:bg-gray-50"
                   >
                     <UserCircleIcon className="h-6 w-6" aria-hidden="true" />

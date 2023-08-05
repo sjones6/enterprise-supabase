@@ -14,10 +14,10 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc -w",
-    "db:reset": "supabase db reset",
+    "db:reset": "supabase db reset && npm run supabase:types",
     "supabase:start": "supabase start",
     "supabase:stop": "supbase stop",
-    "supabase:types": "supabase gen types typescript --local --schema authz > src/database.ts",
+    "supabase:types": "supabase gen types typescript --local --schema authz > src/database.ts && cp src/database.ts example/src/lib/database.ts",
     "prettier": "prettier . --write",
     "prepare": "husky install"
   },
