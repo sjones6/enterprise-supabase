@@ -1,7 +1,4 @@
-import {
-  CreateOrUpdateOrganization,
-  organizations,
-} from "enterprise-supabase";
+import { CreateOrUpdateOrganization, organizations } from "enterprise-supabase";
 import { useMutation, useQueryClient } from "react-query";
 import { useSupabaseClient } from "../context/SupabaseClientProvider";
 
@@ -14,7 +11,7 @@ export const useCreateOrganization = () => {
     {
       onSuccess() {
         queryClient.invalidateQueries({
-          queryKey: ["enterprise", "organizations"]
+          queryKey: ["enterprise", "organizations"],
         });
       },
       retry: false,
