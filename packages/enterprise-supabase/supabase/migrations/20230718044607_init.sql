@@ -443,16 +443,23 @@ CREATE OR REPLACE FUNCTION public.create_organization(name text)
   AS $BODY$
   DECLARE
     organization_id uuid = gen_random_uuid();
+    member_id uuid = gen_random_uuid();
     organization organizations;
   BEGIN
+
+    -- create the organization
     INSERT INTO public.organizations(id, name)
       VALUES(organization_id, name);
-    INSERT INTO public.members(organization_id, user_id)
-      VALUES(organization_id, auth.uid());
+
+    --   create membership in the organization
+    INSERT INTO public.members(id, organization_id, user_id)
+      VALUES(member_id, organization_id, auth.uid());
+
+    --   make the creator the owner in the new org
     INSERT  INTO public.member_roles(role_id, member_id)
       VALUES(
         (SELECT id FROM public.roles r WHERE r.slug = 'owner'),
-        (SELECT id FROM public.members m WHERE m.user_id = auth.uid())
+        member_id
       );
     SELECT * FROM public.organizations INTO organization WHERE id = organization_id;
     return organization;

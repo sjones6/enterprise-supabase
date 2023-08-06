@@ -1,6 +1,6 @@
 import { createContext, useContext, PropsWithChildren } from "react";
 import { QueryClient, QueryClientProvider } from "react-query";
-import type { EnterpriseSupabaseClient } from "../../types";
+import type { EnterpriseSupabaseClient } from "enterprise-supabase";
 
 const defaultQueryClient = new QueryClient();
 

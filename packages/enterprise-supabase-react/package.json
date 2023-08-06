@@ -1,6 +1,6 @@
 {
-  "name": "enterprise-supabase",
-  "description": "A starter kit for building enterprise applications with Supabase.",
+  "name": "enterprise-supabase-react",
+  "description": "React components for building enterprise applications with Supabase.",
   "author": {
     "name": "Spencer Jones",
     "email": "jones.spencera@gmail.com",
@@ -20,19 +20,22 @@
   "version": "0.0.0",
   "scripts": {
     "dev": "npm run build -- --watch",
-    "build": "tsup src/index.ts --format cjs,esm --dts",
-    "db:reset": "supabase db reset && npm run supabase:types",
-    "supabase:start": "supabase start",
-    "supabase:stop": "supabase stop",
-    "supabase:types": "supabase gen types typescript --local --schema public > src/database.ts && cp src/database.ts ../../apps/example/src/lib/database.ts"
+    "build": "tsup src/index.ts --format cjs,esm --dts"
   },
   "peerDependencies": {
-    "typescript": ">5.1.6",
-    "@supabase/supabase-js": "^2.31.0"
+    "react": ">18.2.0",
+    "react-query": "^3.39.3",
+    "typescript": ">5.1.6"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.31.0",
+    "@types/react": "^18.2.18",
+    "react": "^18.2.0",
     "supabase": "^1.82.6",
     "typescript": "^5.1.6"
+  },
+  "dependencies": {
+    "enterprise-supabase": "*",
+    "react-query": "^3.39.3"
   }
 }

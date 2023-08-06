@@ -2,7 +2,7 @@ import type { PropsWithChildren } from "react";
 import { HomeIcon, UserCircleIcon } from "@heroicons/react/24/outline";
 import { useAuth } from "@/components/auth";
 import { Link, useLocation } from "react-router-dom";
-import { useCreateOrganization, useOrganizations } from "enterprise-supabase";
+import { useCreateOrganization, useOrganizations } from "enterprise-supabase-react";
 import * as paths from "@/lib/paths";
 import { Button } from "@/components/ui/button";
 
@@ -105,8 +105,12 @@ export default function Layout({
                       </li>
                     ))}
                   </ul>
+                  <Button variant='outline' onClick={async () => {
+                    await mutateAsync({ name: `${Date.now()}` })
+                  }}>Create organization.</Button>
                 </li>
               ) : null}
+              
               {session.session && (
                 <li className="-mx-6 mt-auto">
                   <Link

@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "moduleResolution": "node",
+    "module": "esnext",
+    "jsx": "react-jsx",
+    "lib": ["es2016", "dom", "es5"],
+    "declaration": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "removeComments": true,
+    "noImplicitAny": false,
+    "noImplicitThis": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "typeRoots": ["node_modules/@types"],
+    "skipLibCheck": true
+  },
+  "exclude": ["node_modules", "dist", "__tests__"],
+  "include": ["src/**/*.tsx", "src/**/*.ts"]
+}

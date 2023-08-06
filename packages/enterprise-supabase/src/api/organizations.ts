@@ -1,4 +1,4 @@
-import {
+import type {
   PostgrestMaybeSingleResponse,
   PostgrestSingleResponse,
 } from "@supabase/supabase-js";

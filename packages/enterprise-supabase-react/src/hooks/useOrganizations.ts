@@ -1,11 +1,11 @@
-import { organizations } from "../../api/organizations";
+import { organizations } from "enterprise-supabase";
+import type { Organization } from "enterprise-supabase";
 import { UseQueryOptions, UseQueryResult, useQuery } from "react-query";
 import { useSupabaseClient } from "../context/SupabaseClientProvider";
 import { PostgrestMaybeSingleResponse, PostgrestSingleResponse } from "@supabase/supabase-js";
-import { Organization } from "../../types";
 
 export const useOrganizations = (
-  options: UseQueryOptions<PostgrestSingleResponse<Organization[]>> = {}
+  options: Omit<UseQueryOptions<PostgrestSingleResponse<Organization[]>>, 'queryKey'> = {}
 ): UseQueryResult<PostgrestSingleResponse<Organization[]>> => {
   const supabase = useSupabaseClient();
   return useQuery(
@@ -17,7 +17,7 @@ export const useOrganizations = (
 
 export const useOrganizationById = (
   organization: string,
-  options: UseQueryOptions<PostgrestMaybeSingleResponse<Organization>> = {}
+  options: Omit<UseQueryOptions<PostgrestMaybeSingleResponse<Organization>>, 'queryKey'> = {}
 ): UseQueryResult<PostgrestMaybeSingleResponse<Organization>> => {
   const supabase = useSupabaseClient();
   return useQuery(
