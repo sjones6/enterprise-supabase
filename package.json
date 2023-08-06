@@ -1,42 +1,25 @@
 {
-  "name": "enterprise-supabase",
-  "description": "A starter kit for building enterprise applications with Supabase.",
-  "author": {
-    "name": "Spencer Jones",
-    "email": "jones.spencera@gmail.com",
-    "url": "https://github.com/sjones6"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/sjones6/enterprise-supabase"
-  },
-  "version": "0.0.0",
+  "private": true,
   "scripts": {
-    "build": "tsc",
-    "build:watch": "tsc -w",
-    "db:reset": "supabase db reset && npm run supabase:types",
-    "supabase:start": "supabase start",
-    "supabase:stop": "supbase stop",
-    "supabase:types": "supabase gen types typescript --local --schema authz > src/database.ts && cp src/database.ts example/src/lib/database.ts",
-    "prettier": "prettier . --write",
-    "prepare": "husky install"
-  },
-  "peerDependencies": {
-    "react": ">18.2.0",
-    "typescript": ">5.1.6"
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },
   "devDependencies": {
-    "@supabase/supabase-js": "^2.31.0",
-    "husky": "^8.0.3",
-    "lint-staged": "^13.2.3",
-    "react": "^18.2.0",
-    "supabase": "^1.82.6",
-    "typescript": "^5.1.6"
+    "@turbo/gen": "^1.9.7",
+    "eslint": "^7.32.0",
+    "eslint-config-custom": "*",
+    "prettier": "^2.5.1",
+    "turbo": "latest"
   },
+  "name": "supabase-enterprise",
+  "packageManager": "npm@9.5.1",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "dependencies": {
-    "@supabase/auth-ui-react": "^0.4.2"
-  },
-  "lint-staged": {
-    "**/*": "prettier --write --ignore-unknown"
+    "tsup": "^7.2.0"
   }
 }
