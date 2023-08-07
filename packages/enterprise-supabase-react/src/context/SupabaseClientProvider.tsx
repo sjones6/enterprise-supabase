@@ -1,15 +1,20 @@
-import { createContext, useContext, PropsWithChildren } from "react";
+import { createContext, useContext, PropsWithChildren, useMemo } from "react";
 import { QueryClient, QueryClientProvider } from "react-query";
-import type { EnterpriseSupabaseClient } from "enterprise-supabase";
+import {
+  createApi,
+  type EnterpriseSupabaseAPIClient,
+  type EnterpriseSupabaseClient,
+} from "enterprise-supabase";
 
 const defaultQueryClient = new QueryClient();
 
 type SupabaseClientContext = {
   client: EnterpriseSupabaseClient;
+  apiClient: EnterpriseSupabaseAPIClient;
 };
 
 const SupabaseClientProviderContext =
-  createContext<SupabaseClientContext>(null);
+  createContext<SupabaseClientContext | null>(null);
 
 export const SupabaseClientProvider = ({
   children,
@@ -19,9 +24,10 @@ export const SupabaseClientProvider = ({
   client: EnterpriseSupabaseClient;
   queryClient?: QueryClient;
 }>): JSX.Element => {
+  const apiClient = useMemo(() => createApi(client), [client]);
   return (
     <QueryClientProvider client={queryClient}>
-      <SupabaseClientProviderContext.Provider value={{ client }}>
+      <SupabaseClientProviderContext.Provider value={{ client, apiClient }}>
         {children}
       </SupabaseClientProviderContext.Provider>
     </QueryClientProvider>
@@ -30,5 +36,23 @@ export const SupabaseClientProvider = ({
 
 export const useSupabaseClient = (): EnterpriseSupabaseClient => {
   const ctx = useContext(SupabaseClientProviderContext);
-  return ctx.client!;
+  if (!ctx) {
+    console.error(
+      "Please be sure to wrap all elements in a <SupabaseClientProvider client={supabase}> context"
+    );
+    throw new Error("Missing SupabaseClientProvider context");
+  }
+  return ctx.client;
 };
+
+export const useEnterpriseSupabaseApiClient =
+  (): EnterpriseSupabaseAPIClient => {
+    const ctx = useContext(SupabaseClientProviderContext);
+    if (!ctx) {
+      console.error(
+        "Please be sure to wrap all elements in a <SupabaseClientProvider client={supabase}> context"
+      );
+      throw new Error("Missing SupabaseClientProvider context");
+    }
+    return ctx.apiClient;
+  };

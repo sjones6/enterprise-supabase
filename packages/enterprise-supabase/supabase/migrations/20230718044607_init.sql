@@ -32,8 +32,8 @@ CREATE TABLE IF NOT EXISTS public.organizations
 (
     id uuid PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
     name text NOT NULL COLLATE pg_catalog."default",
-    updated_at timestamp without time zone NOT NULL,
-    created_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone,
+    created_at timestamp without time zone
 )
 TABLESPACE pg_default;
 
@@ -53,8 +53,8 @@ CREATE TABLE IF NOT EXISTS public.members
     user_id uuid NOT NULL REFERENCES auth.users (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    updated_at timestamp without time zone NOT NULL,
-    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone,
+    created_at timestamp without time zone,
     CONSTRAINT members_organizations_id_user_id_key UNIQUE (organization_id, user_id)     
 )
 TABLESPACE pg_default;
@@ -76,8 +76,8 @@ CREATE TABLE IF NOT EXISTS public.roles
     organization_id uuid REFERENCES public.organizations (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    updated_at timestamp without time zone NOT NULL,
-    created_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone,
+    created_at timestamp without time zone
 )
 TABLESPACE pg_default;
 
@@ -94,8 +94,8 @@ CREATE TABLE IF NOT EXISTS public.permissions
     name text NOT NULL COLLATE pg_catalog."default",
     slug text NOT NULL UNIQUE COLLATE pg_catalog."default",
     description text NOT NULL COLLATE pg_catalog."default" DEFAULT '',
-    updated_at timestamp without time zone NOT NULL,
-    created_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone,
+    created_at timestamp without time zone
 )
 TABLESPACE pg_default;
 
@@ -115,8 +115,8 @@ CREATE TABLE IF NOT EXISTS public.role_permissions
     permission_id uuid NOT NULL REFERENCES public.permissions (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    updated_at timestamp without time zone NOT NULL,
-    created_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone,
+    created_at timestamp without time zone
 )
 TABLESPACE pg_default;
 
@@ -136,8 +136,8 @@ CREATE TABLE IF NOT EXISTS public.member_roles
     member_id uuid NOT NULL REFERENCES public.members (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    updated_at timestamp without time zone NOT NULL,
-    created_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone,
+    created_at timestamp without time zone
 )
 TABLESPACE pg_default;
 
@@ -157,8 +157,8 @@ CREATE TABLE IF NOT EXISTS public.groups
     organization_id uuid NOT NULL REFERENCES public.organizations (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    updated_at timestamp without time zone NOT NULL,
-    created_at timestamp without time zone NOT NULL  
+    updated_at timestamp without time zone,
+    created_at timestamp without time zone  
 )
 TABLESPACE pg_default;
 
@@ -180,8 +180,8 @@ CREATE TABLE IF NOT EXISTS public.group_roles
     group_id uuid NOT NULL REFERENCES public.groups (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    updated_at timestamp without time zone NOT NULL,
-    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone,
+    created_at timestamp without time zone,
     CONSTRAINT group_roles_group__id_role_id_key UNIQUE (group_id, role_id)   
 )
 TABLESPACE pg_default;
@@ -199,12 +199,12 @@ CREATE TABLE IF NOT EXISTS public.group_members
     group_id uuid NOT NULL REFERENCES public.groups (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    user_id uuid NOT NULL REFERENCES auth.users (id) MATCH SIMPLE
+    member_id uuid NOT NULL REFERENCES public.members (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    updated_at timestamp without time zone NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    CONSTRAINT group_members_group_id_user_id_key UNIQUE (group_id, user_id)     
+    updated_at timestamp without time zone,
+    created_at timestamp without time zone,
+    CONSTRAINT group_members_group_id_member_id_key UNIQUE (group_id, member_id)     
 )
 TABLESPACE pg_default;
 
@@ -250,7 +250,8 @@ AS $BODY$
             LEFT JOIN group_roles gr ON r.id = gr.role_id
             LEFT JOIN groups g on g.id = gr.group_id
             LEFT JOIN group_members gm ON gm.group_id = g.id
-            WHERE gm.user_id = auth.uid() AND g.organization_id = $1
+            LEFT JOIN members m ON m.id = gm.member_id
+            WHERE m.user_id = auth.uid() AND g.organization_id = $1
       )
 $BODY$;
 
@@ -352,7 +353,9 @@ CREATE OR REPLACE FUNCTION public.has_group_membership(group_id uuid)
     SET search_path=public
 AS $BODY$
     SElECT EXISTS(
-        SELECT 1 FROM group_members gm WHERE gm.id = group_id AND gm.user_id = auth.uid()
+        SELECT 1 FROM group_members gm
+            LEFT JOIN public.members m ON m.id = gm.member_id
+            WHERE gm.id = group_id AND m.user_id = auth.uid()
     )
 $BODY$;
 
@@ -492,7 +495,7 @@ CREATE POLICY "Require `select-organization` in org"
     ON public.organizations 
     AS PERMISSIVE
     FOR SELECT
-    TO public
+    TO authenticated
     USING ( public.has_permission_in_organization(organizations.id, 'select-organization') );
 
 CREATE POLICY "Users can create organizations"
@@ -502,18 +505,18 @@ CREATE POLICY "Users can create organizations"
     TO public
     WITH CHECK ( auth.uid() IS NOT NULL );
 
-CREATE POLICY "Owners can delete organizations"
+CREATE POLICY "Require `delete-organization` in org"
     ON public.organizations 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR DELETE
-    TO public
+    TO authenticated
     USING ( public.has_permission_in_organization(organizations.id, 'delete-organization') );
 
-CREATE POLICY "Owners can update organizations"
+CREATE POLICY "Require `edit-organization` in org"
     ON public.organizations 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR UPDATE
-    TO public
+    TO authenticated
     USING ( public.has_permission_in_organization(organizations.id, 'edit-organization') )
     WITH CHECK ( public.has_permission_in_organization(organizations.id, 'edit-organization') );
 
@@ -538,21 +541,21 @@ CREATE POLICY "Requires permission `select-member` to select member"
 
 CREATE POLICY "Requires permission `add-member` to add member"
     ON public.members 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR INSERT
     TO public
     WITH CHECK ( public.has_permission_in_organization(members.organization_id, 'add-member') );
 
 CREATE POLICY "Requires permission `delete-member` to remove member"
     ON public.members
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR DELETE
     TO public
     USING ( public.has_permission_in_organization(members.organization_id, 'delete-member') );
 
 CREATE POLICY "Requires permission `edit-member` to update member"
     ON public.members 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR UPDATE
     TO public
     USING ( public.has_permission_in_organization(members.organization_id, 'edit-member') )
@@ -584,7 +587,7 @@ CREATE POLICY "Requires permission `select-member` to view members role"
 
 CREATE POLICY "Require `edit-member` in org"
     ON public.member_roles 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR INSERT
     TO authenticated
     WITH CHECK (
@@ -599,7 +602,7 @@ CREATE POLICY "Require `edit-member` in org"
 
 CREATE POLICY "Requires permission `edit-member` to remove member's role"
     ON public.member_roles
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR DELETE
     TO authenticated
     USING (
@@ -611,7 +614,7 @@ CREATE POLICY "Requires permission `edit-member` to remove member's role"
 
 CREATE POLICY "Requires permission `edit-member` to update a member's role"
     ON public.member_roles 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR UPDATE
     TO authenticated
     USING (
@@ -659,7 +662,7 @@ CREATE POLICY "Authenticated and service roles can select roles"
 
 CREATE POLICY "Require `select-role` in org"
     ON public.roles 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR SELECT
     TO authenticated
     USING ( 
@@ -671,14 +674,14 @@ CREATE POLICY "Require `select-role` in org"
 
 CREATE POLICY "Only `CURRENT_ROLE` can insert system roles"
     ON public.roles 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR INSERT
     TO CURRENT_ROLE
     WITH CHECK ( roles.organization_id IS NULL );
 
 CREATE POLICY "Require `insert-role` in org"
     ON public.roles 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR INSERT
     TO authenticated
     WITH CHECK ( 
@@ -690,7 +693,7 @@ CREATE POLICY "Require `insert-role` in org"
 
 CREATE POLICY "Only `CURRENT_ROLE` can updat system roles"
     ON public.roles 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR UPDATE
     TO CURRENT_ROLE
     USING ( roles.organization_id IS NULL )
@@ -698,7 +701,7 @@ CREATE POLICY "Only `CURRENT_ROLE` can updat system roles"
 
 CREATE POLICY "Require `update-role` in org"
     ON public.roles 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR UPDATE
     TO CURRENT_ROLE
     USING ( 
@@ -716,14 +719,14 @@ CREATE POLICY "Require `update-role` in org"
 
 CREATE POLICY "Only `CURRENT_ROLE` can delete system roles"
     ON public.roles 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR DELETE
     TO CURRENT_ROLE
     USING ( roles.organization_id IS NULL );
 
 CREATE POLICY "Require `delete-role` in org"
     ON public.roles 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR DELETE
     TO authenticated
     USING ( 
@@ -754,14 +757,14 @@ CREATE POLICY "Permission select permissions"
 
 CREATE POLICY "Only `CURRENT_ROLE` can insert permissions"
     ON public.permissions 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR INSERT
     TO CURRENT_ROLE
     WITH CHECK ( true );
 
 CREATE POLICY "Only `CURRENT_ROLE` can update permissions"
     ON public.permissions 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR UPDATE
     TO CURRENT_ROLE
     USING ( true )
@@ -769,7 +772,7 @@ CREATE POLICY "Only `CURRENT_ROLE` can update permissions"
 
 CREATE POLICY "Only `CURRENT_ROLE` can delete permissions"
     ON public.permissions 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR DELETE
     TO CURRENT_ROLE
     USING ( true );
@@ -797,7 +800,7 @@ CREATE POLICY "Permissive select for system role_permissions"
 
 CREATE POLICY "Select requires `select-role` in org"
     ON public.role_permissions 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR SELECT
     TO authenticated
     USING ( 
@@ -809,7 +812,7 @@ CREATE POLICY "Select requires `select-role` in org"
 
 CREATE POLICY "Only `CURRENT_ROLE` can insert system role_permissions"
     ON public.role_permissions 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR INSERT
     TO CURRENT_ROLE
     WITH CHECK ( 
@@ -818,7 +821,7 @@ CREATE POLICY "Only `CURRENT_ROLE` can insert system role_permissions"
 
 CREATE POLICY "Insert requires `edit-role` in org"
     ON public.role_permissions 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR INSERT
     TO authenticated
     WITH CHECK ( 
@@ -830,7 +833,7 @@ CREATE POLICY "Insert requires `edit-role` in org"
 
 CREATE POLICY "Only `CURRENT_ROLE` can update system role_permissions"
     ON public.role_permissions 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR UPDATE
     TO CURRENT_ROLE
     USING ( 
@@ -842,7 +845,7 @@ CREATE POLICY "Only `CURRENT_ROLE` can update system role_permissions"
 
 CREATE POLICY "Update requires `edit-role` in org"
     ON public.role_permissions 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR UPDATE
     TO authenticated
     USING (
@@ -860,7 +863,7 @@ CREATE POLICY "Update requires `edit-role` in org"
 
 CREATE POLICY "Only `CURRENT_ROLE` can delete system role_permissions"
     ON public.role_permissions 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR DELETE
     TO CURRENT_ROLE
     USING ( 
@@ -869,7 +872,7 @@ CREATE POLICY "Only `CURRENT_ROLE` can delete system role_permissions"
 
 CREATE POLICY "Delete require `edit-role` in org"
     ON public.role_permissions 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR DELETE
     TO authenticated
     USING (
@@ -880,7 +883,7 @@ CREATE POLICY "Delete require `edit-role` in org"
     );
 
 
--- Groups (join)
+-- Groups
 ALTER TABLE IF EXISTS public.groups
     OWNER to CURRENT_ROLE;
 
@@ -907,7 +910,7 @@ CREATE POLICY "Require `select-group` OR membership"
 
 CREATE POLICY "Require `add-group` in org"
     ON public.groups 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR INSERT
     TO authenticated
     WITH CHECK (
@@ -919,7 +922,7 @@ CREATE POLICY "Require `add-group` in org"
 
 CREATE POLICY "Require `delete-group` in org"
     ON public.groups
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR DELETE
     TO authenticated
     USING (
@@ -931,7 +934,7 @@ CREATE POLICY "Require `delete-group` in org"
 
 CREATE POLICY "Require `edit-group` in org"
     ON public.groups 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR UPDATE
     TO authenticated
     USING (
@@ -966,7 +969,7 @@ CREATE POLICY "Require `select-group` OR membership"
     FOR SELECT
     TO authenticated
     USING (
-        group_members.user_id = auth.uid() OR 
+        public.has_group_membership(group_members.group_id) OR 
         public.has_permission_in_organization(
             (SELECT organization_id FROM public.groups g WHERE g.id = group_members.group_id),
             'select-group'
@@ -975,7 +978,7 @@ CREATE POLICY "Require `select-group` OR membership"
 
 CREATE POLICY "Require `edit-group` to add"
     ON public.group_members 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR INSERT
     TO authenticated
     WITH CHECK (
@@ -987,7 +990,7 @@ CREATE POLICY "Require `edit-group` to add"
 
 CREATE POLICY "Require `edit-group` to delete"
     ON public.group_members
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR DELETE
     TO authenticated
     USING (
@@ -999,7 +1002,7 @@ CREATE POLICY "Require `edit-group` to delete"
 
 CREATE POLICY "Require `edit-group` to update"
     ON public.group_members 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR UPDATE
     TO authenticated
     USING (
@@ -1043,7 +1046,7 @@ CREATE POLICY "Require `select-group` / membership"
 
 CREATE POLICY "Require `edit-group` to add"
     ON public.group_roles 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR INSERT
     TO authenticated
     WITH CHECK (
@@ -1059,7 +1062,7 @@ CREATE POLICY "Require `edit-group` to add"
 
 CREATE POLICY "Require `edit-group` to delete"
     ON public.group_roles
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR DELETE
     TO authenticated
     USING (
@@ -1075,7 +1078,7 @@ CREATE POLICY "Require `edit-group` to delete"
 
 CREATE POLICY "Require `edit-group` to update"
     ON public.group_roles 
-    AS RESTRICTIVE
+    AS PERMISSIVE
     FOR UPDATE
     TO authenticated
     USING (

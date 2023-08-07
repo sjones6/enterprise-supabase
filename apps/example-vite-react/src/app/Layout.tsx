@@ -3,6 +3,8 @@ import { HomeIcon, UserCircleIcon } from "@heroicons/react/24/outline";
 import { useAuth } from "@/components/auth";
 import { Link, useLocation } from "react-router-dom";
 import {
+  DialogCreateOrganization,
+  DialogEditOrganization,
   useCreateOrganization,
   useOrganizations,
 } from "enterprise-supabase-react";
@@ -22,7 +24,6 @@ export default function Layout({
   const session = useAuth();
 
   const organizations = useOrganizations();
-  const { mutateAsync } = useCreateOrganization();
 
   return (
     <div className="flex flex-row h-screen w-screen">
@@ -71,26 +72,23 @@ export default function Layout({
               {/* Teams / Secondary Menu Item Block */}
               {organizations.isLoading ? (
                 <li>loading...</li>
-              ) : organizations.data?.data?.length === 0 ? (
+              ) : organizations.data?.length === 0 ? (
                 <li>
                   No organizations.{" "}
-                  <Button
-                    variant="outline"
-                    onClick={async () => {
-                      await mutateAsync({ name: `${Date.now()}` });
-                    }}
-                  >
-                    Create your first.
-                  </Button>
+                  <DialogCreateOrganization
+                    trigger={
+                      <Button variant={"outline"}>Create Organization</Button>
+                    }
+                  />
                 </li>
-              ) : organizations.data?.data?.length &&
-                organizations.data?.data?.length > 0 ? (
+              ) : organizations.data?.length &&
+                organizations.data?.length > 0 ? (
                 <li>
                   <div className="text-xs font-semibold leading-6 text-gray-400">
                     Your organizations
                   </div>
                   <ul role="list" className="-mx-2 mt-2 space-y-1">
-                    {organizations.data.data.map((organization) => (
+                    {organizations.data.map((organization) => (
                       <li key={organization.id}>
                         <a
                           href={paths.organization(organization)}
@@ -113,17 +111,18 @@ export default function Layout({
                           </span>
                           <span className="truncate">{organization.name}</span>
                         </a>
+                        <DialogEditOrganization
+                          organizationId={organization.id}
+                          trigger={<Button size={"sm"}>edit</Button>}
+                        />
                       </li>
                     ))}
                   </ul>
-                  <Button
-                    variant="outline"
-                    onClick={async () => {
-                      await mutateAsync({ name: `${Date.now()}` });
-                    }}
-                  >
-                    Create organization.
-                  </Button>
+                  <DialogCreateOrganization
+                    trigger={
+                      <Button variant={"outline"}>Create Organization</Button>
+                    }
+                  />
                 </li>
               ) : null}
 

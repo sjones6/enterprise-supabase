@@ -11,25 +11,25 @@ export interface Database {
     Tables: {
       group_members: {
         Row: {
-          created_at: string;
+          created_at: string | null;
           group_id: string;
           id: string;
-          updated_at: string;
-          user_id: string;
+          member_id: string;
+          updated_at: string | null;
         };
         Insert: {
-          created_at: string;
+          created_at?: string | null;
           group_id: string;
           id?: string;
-          updated_at: string;
-          user_id: string;
+          member_id: string;
+          updated_at?: string | null;
         };
         Update: {
-          created_at?: string;
+          created_at?: string | null;
           group_id?: string;
           id?: string;
-          updated_at?: string;
-          user_id?: string;
+          member_id?: string;
+          updated_at?: string | null;
         };
         Relationships: [
           {
@@ -39,34 +39,34 @@ export interface Database {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "group_members_user_id_fkey";
-            columns: ["user_id"];
-            referencedRelation: "users";
+            foreignKeyName: "group_members_member_id_fkey";
+            columns: ["member_id"];
+            referencedRelation: "members";
             referencedColumns: ["id"];
           }
         ];
       };
       group_roles: {
         Row: {
-          created_at: string;
+          created_at: string | null;
           group_id: string;
           id: string;
           role_id: string;
-          updated_at: string;
+          updated_at: string | null;
         };
         Insert: {
-          created_at: string;
+          created_at?: string | null;
           group_id: string;
           id?: string;
           role_id: string;
-          updated_at: string;
+          updated_at?: string | null;
         };
         Update: {
-          created_at?: string;
+          created_at?: string | null;
           group_id?: string;
           id?: string;
           role_id?: string;
-          updated_at?: string;
+          updated_at?: string | null;
         };
         Relationships: [
           {
@@ -85,28 +85,28 @@ export interface Database {
       };
       groups: {
         Row: {
-          created_at: string;
+          created_at: string | null;
           description: string;
           id: string;
           name: string;
           organization_id: string;
-          updated_at: string;
+          updated_at: string | null;
         };
         Insert: {
-          created_at: string;
+          created_at?: string | null;
           description?: string;
           id?: string;
           name: string;
           organization_id: string;
-          updated_at: string;
+          updated_at?: string | null;
         };
         Update: {
-          created_at?: string;
+          created_at?: string | null;
           description?: string;
           id?: string;
           name?: string;
           organization_id?: string;
-          updated_at?: string;
+          updated_at?: string | null;
         };
         Relationships: [
           {
@@ -119,25 +119,25 @@ export interface Database {
       };
       member_roles: {
         Row: {
-          created_at: string;
+          created_at: string | null;
           id: string;
           member_id: string;
           role_id: string;
-          updated_at: string;
+          updated_at: string | null;
         };
         Insert: {
-          created_at: string;
+          created_at?: string | null;
           id?: string;
           member_id: string;
           role_id: string;
-          updated_at: string;
+          updated_at?: string | null;
         };
         Update: {
-          created_at?: string;
+          created_at?: string | null;
           id?: string;
           member_id?: string;
           role_id?: string;
-          updated_at?: string;
+          updated_at?: string | null;
         };
         Relationships: [
           {
@@ -156,24 +156,24 @@ export interface Database {
       };
       members: {
         Row: {
-          created_at: string;
+          created_at: string | null;
           id: string;
           organization_id: string;
-          updated_at: string;
+          updated_at: string | null;
           user_id: string;
         };
         Insert: {
-          created_at: string;
+          created_at?: string | null;
           id?: string;
           organization_id: string;
-          updated_at: string;
+          updated_at?: string | null;
           user_id: string;
         };
         Update: {
-          created_at?: string;
+          created_at?: string | null;
           id?: string;
           organization_id?: string;
-          updated_at?: string;
+          updated_at?: string | null;
           user_id?: string;
         };
         Relationships: [
@@ -193,73 +193,73 @@ export interface Database {
       };
       organizations: {
         Row: {
-          created_at: string;
+          created_at: string | null;
           id: string;
           name: string;
-          updated_at: string;
+          updated_at: string | null;
         };
         Insert: {
-          created_at: string;
+          created_at?: string | null;
           id?: string;
           name: string;
-          updated_at: string;
+          updated_at?: string | null;
         };
         Update: {
-          created_at?: string;
+          created_at?: string | null;
           id?: string;
           name?: string;
-          updated_at?: string;
+          updated_at?: string | null;
         };
         Relationships: [];
       };
       permissions: {
         Row: {
-          created_at: string;
+          created_at: string | null;
           description: string;
           id: string;
           name: string;
           slug: string;
-          updated_at: string;
+          updated_at: string | null;
         };
         Insert: {
-          created_at: string;
+          created_at?: string | null;
           description?: string;
           id?: string;
           name: string;
           slug: string;
-          updated_at: string;
+          updated_at?: string | null;
         };
         Update: {
-          created_at?: string;
+          created_at?: string | null;
           description?: string;
           id?: string;
           name?: string;
           slug?: string;
-          updated_at?: string;
+          updated_at?: string | null;
         };
         Relationships: [];
       };
       role_permissions: {
         Row: {
-          created_at: string;
+          created_at: string | null;
           id: string;
           permission_id: string;
           role_id: string;
-          updated_at: string;
+          updated_at: string | null;
         };
         Insert: {
-          created_at: string;
+          created_at?: string | null;
           id?: string;
           permission_id: string;
           role_id: string;
-          updated_at: string;
+          updated_at?: string | null;
         };
         Update: {
-          created_at?: string;
+          created_at?: string | null;
           id?: string;
           permission_id?: string;
           role_id?: string;
-          updated_at?: string;
+          updated_at?: string | null;
         };
         Relationships: [
           {
@@ -278,31 +278,31 @@ export interface Database {
       };
       roles: {
         Row: {
-          created_at: string;
+          created_at: string | null;
           description: string | null;
           id: string;
           name: string;
           organization_id: string | null;
           slug: string;
-          updated_at: string;
+          updated_at: string | null;
         };
         Insert: {
-          created_at: string;
+          created_at?: string | null;
           description?: string | null;
           id?: string;
           name: string;
           organization_id?: string | null;
           slug: string;
-          updated_at: string;
+          updated_at?: string | null;
         };
         Update: {
-          created_at?: string;
+          created_at?: string | null;
           description?: string | null;
           id?: string;
           name?: string;
           organization_id?: string | null;
           slug?: string;
-          updated_at?: string;
+          updated_at?: string | null;
         };
         Relationships: [
           {
@@ -323,10 +323,10 @@ export interface Database {
           name: string;
         };
         Returns: {
-          created_at: string;
+          created_at: string | null;
           id: string;
           name: string;
-          updated_at: string;
+          updated_at: string | null;
         };
       };
       get_permissions_in_organization: {
