@@ -8,7 +8,6 @@
 ## TODO
 
 - UI
-  - Organization switcher
   - Members
     - Table
     - Create

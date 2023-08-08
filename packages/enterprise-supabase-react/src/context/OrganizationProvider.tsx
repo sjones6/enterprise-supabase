@@ -19,12 +19,15 @@ export const OrganizationProvider = ({
   const { data } = useOrganizations({
     enabled: !!auth.session,
   });
-  const primaryOrganization = auth && auth.session && auth.session.user.app_metadata.organization;
+  const primaryOrganization =
+    auth && auth.session && auth.session.user.app_metadata.organization;
   return (
-    <OrganizationContext.Provider value={{
-      organizations: data || [],
-      primaryOrganization: primaryOrganization || null,
-    }}>
+    <OrganizationContext.Provider
+      value={{
+        organizations: data || [],
+        primaryOrganization: primaryOrganization || null,
+      }}
+    >
       {children}
     </OrganizationContext.Provider>
   );

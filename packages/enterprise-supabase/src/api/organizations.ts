@@ -89,7 +89,9 @@ export class OrganizationsClient implements IOrganizationsClient {
   async setActiveOrganization(organizationId: string): Promise<void> {
     await this.supabase
       .schema("authz")
-      .rpc("set_active_organization", { active_organization_id: organizationId })
+      .rpc("set_active_organization", {
+        active_organization_id: organizationId,
+      })
       .throwOnError();
     await this.supabase.auth.refreshSession();
   }

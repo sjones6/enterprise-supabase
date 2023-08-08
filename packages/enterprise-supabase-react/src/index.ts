@@ -3,6 +3,7 @@ export * from "./context/SupabaseClientProvider";
 
 // General
 export * from "./components/OrganizationSelector";
+export * from "./components/Theme";
 
 // Hooks
 export * from "./hooks/useOrganizations";

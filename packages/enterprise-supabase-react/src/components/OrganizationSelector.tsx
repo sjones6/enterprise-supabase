@@ -1,5 +1,8 @@
 import { useOrganizationContext } from "../context/OrganizationProvider";
-import { useOrganizations, useSetPrimaryOrganization } from "../hooks/useOrganizations";
+import {
+  useOrganizations,
+  useSetPrimaryOrganization,
+} from "../hooks/useOrganizations";
 import {
   Select,
   SelectContent,
@@ -20,7 +23,7 @@ export function OrganizationSelector() {
   const { mutateAsync } = useSetPrimaryOrganization();
 
   if (isLoading) {
-    return <Skeleton className="h-[40px] w-[180px]"/>;
+    return <Skeleton className="h-[40px] w-[180px]" />;
   }
 
   return (
@@ -43,10 +46,10 @@ export function OrganizationSelector() {
             <SelectGroup>
               <SelectLabel>Organizations</SelectLabel>
               {organizations.map((organization) => (
-                  <SelectItem key={organization.id} value={organization.id}>
-                    {organization.name}
-                  </SelectItem>
-                ))}
+                <SelectItem key={organization.id} value={organization.id}>
+                  {organization.name}
+                </SelectItem>
+              ))}
             </SelectGroup>
             <Separator className="my-2" />
           </>
@@ -55,9 +58,13 @@ export function OrganizationSelector() {
           form={{
             async onSuccess(organization) {
               await mutateAsync(organization.id);
-            }
+            },
           }}
-          trigger={<Button className="w-full" variant={"secondary"}>Create organization</Button>}
+          trigger={
+            <Button className="w-full" variant={"secondary"}>
+              Create organization
+            </Button>
+          }
         />
       </SelectContent>
     </Select>
