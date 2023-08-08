@@ -5,6 +5,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   DialogCreateOrganization,
   DialogEditOrganization,
+  OrganizationSelector,
   useCreateOrganization,
   useOrganizations,
 } from "enterprise-supabase-react";
@@ -36,6 +37,9 @@ export default function Layout({
           </div>
           <nav className="flex flex-1 flex-col">
             <ul role="list" className="flex flex-1 flex-col gap-y-7">
+              <li>
+                <OrganizationSelector />
+              </li>
               <li>
                 <ul role="list" className="-mx-2 space-y-1">
                   {navigation.map((item) => {
@@ -69,62 +73,6 @@ export default function Layout({
                   })}
                 </ul>
               </li>
-              {/* Teams / Secondary Menu Item Block */}
-              {organizations.isLoading ? (
-                <li>loading...</li>
-              ) : organizations.data?.length === 0 ? (
-                <li>
-                  No organizations.{" "}
-                  <DialogCreateOrganization
-                    trigger={
-                      <Button variant={"outline"}>Create Organization</Button>
-                    }
-                  />
-                </li>
-              ) : organizations.data?.length &&
-                organizations.data?.length > 0 ? (
-                <li>
-                  <div className="text-xs font-semibold leading-6 text-gray-400">
-                    Your organizations
-                  </div>
-                  <ul role="list" className="-mx-2 mt-2 space-y-1">
-                    {organizations.data.map((organization) => (
-                      <li key={organization.id}>
-                        <a
-                          href={paths.organization(organization)}
-                          className={classNames(
-                            false
-                              ? "bg-gray-50 text-indigo-600"
-                              : "text-gray-700 hover:text-indigo-600 hover:bg-gray-50",
-                            "group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold"
-                          )}
-                        >
-                          <span
-                            className={classNames(
-                              false
-                                ? "text-indigo-600 border-indigo-600"
-                                : "text-gray-400 border-gray-200 group-hover:border-indigo-600 group-hover:text-indigo-600",
-                              "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border text-[0.625rem] font-medium bg-white"
-                            )}
-                          >
-                            {organization.name.slice(0, 1)}
-                          </span>
-                          <span className="truncate">{organization.name}</span>
-                        </a>
-                        <DialogEditOrganization
-                          organizationId={organization.id}
-                          trigger={<Button size={"sm"}>edit</Button>}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                  <DialogCreateOrganization
-                    trigger={
-                      <Button variant={"outline"}>Create Organization</Button>
-                    }
-                  />
-                </li>
-              ) : null}
 
               {session.session && (
                 <li className="-mx-6 mt-auto">

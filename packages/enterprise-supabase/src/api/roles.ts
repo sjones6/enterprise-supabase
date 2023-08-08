@@ -30,6 +30,7 @@ export class RolesClient implements IRolesClient {
   async create(role: CreateOrUpdateRole): Promise<Role> {
     return unwrapPostgrestSingleReponse(
       await this.supabase
+        .schema("authz")
         .from("roles")
         .insert({
           ...role,
@@ -44,6 +45,7 @@ export class RolesClient implements IRolesClient {
   async getById(groupId: string): Promise<Role> {
     return unwrapPostgrestSingleReponse(
       await this.supabase
+        .schema("authz")
         .from("roles")
         .select()
         .eq("id", groupId)
@@ -54,13 +56,14 @@ export class RolesClient implements IRolesClient {
 
   async list(): Promise<Role[]> {
     return unwrapPostgrestSingleReponse(
-      await this.supabase.from("roles").select().throwOnError()
+      await this.supabase.schema("authz").from("roles").select().throwOnError()
     );
   }
 
   async updateById(roleId: string, role: CreateOrUpdateRole): Promise<Role> {
     return unwrapPostgrestSingleReponse(
       await this.supabase
+        .schema("authz")
         .from("roles")
         .update({
           ...role,
@@ -76,6 +79,7 @@ export class RolesClient implements IRolesClient {
   async deleteById(groupId: string) {
     return unwrapPostgrestSingleReponse(
       await this.supabase
+        .schema("authz")
         .from("groups")
         .delete()
         .eq("id", groupId)

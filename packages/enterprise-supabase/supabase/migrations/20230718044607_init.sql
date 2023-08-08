@@ -1,9 +1,22 @@
-CREATE SCHEMA IF NOT EXISTS public;
+CREATE SCHEMA IF NOT EXISTS authz;
+
+GRANT USAGE ON SCHEMA authz 
+    TO postgres, anon, authenticated, service_role, dashboard_user;
+
+GRANT USAGE, SELECT 
+    ON ALL SEQUENCES IN SCHEMA authz 
+    TO postgres, authenticated, service_role, dashboard_user, anon;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA authz
+    GRANT ALL ON TABLES TO postgres, service_role, dashboard_user;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA authz
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
 
 -- 
 -- Trigger
 -- 
-CREATE OR REPLACE FUNCTION public.add_timestamps()
+CREATE OR REPLACE FUNCTION authz.add_timestamps()
     RETURNS trigger
     LANGUAGE 'plpgsql'
     COST 100
@@ -18,17 +31,17 @@ AS $BODY$
     END;
 $BODY$;
 
-ALTER FUNCTION public.add_timestamps()
+ALTER FUNCTION authz.add_timestamps()
     OWNER TO postgres;
 
-GRANT EXECUTE ON FUNCTION public.add_timestamps() TO PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.add_timestamps() TO PUBLIC;
 
 -- 
 --  Tables
 -- 
 
 -- Organizations
-CREATE TABLE IF NOT EXISTS public.organizations
+CREATE TABLE IF NOT EXISTS authz.organizations
 (
     id uuid PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
     name text NOT NULL COLLATE pg_catalog."default",
@@ -39,15 +52,15 @@ TABLESPACE pg_default;
 
 CREATE TRIGGER organizations_timestamps
     BEFORE INSERT OR UPDATE 
-    ON public.organizations
+    ON authz.organizations
     FOR EACH ROW
-    EXECUTE FUNCTION public.add_timestamps();
+    EXECUTE FUNCTION authz.add_timestamps();
 
 -- Members
-CREATE TABLE IF NOT EXISTS public.members
+CREATE TABLE IF NOT EXISTS authz.members
 (
     id uuid PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
-    organization_id uuid NOT NULL REFERENCES public.organizations (id) MATCH SIMPLE
+    organization_id uuid NOT NULL REFERENCES authz.organizations (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
     user_id uuid NOT NULL REFERENCES auth.users (id) MATCH SIMPLE
@@ -61,19 +74,19 @@ TABLESPACE pg_default;
 
 CREATE TRIGGER members_timestamps
     BEFORE INSERT OR UPDATE 
-    ON public.members
+    ON authz.members
     FOR EACH ROW
-    EXECUTE FUNCTION public.add_timestamps();
+    EXECUTE FUNCTION authz.add_timestamps();
 
 -- Roles
-CREATE TABLE IF NOT EXISTS public.roles
+CREATE TABLE IF NOT EXISTS authz.roles
 (
     id uuid PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
     name text NOT NULL COLLATE pg_catalog."default",
     slug text NOT NULL UNIQUE COLLATE pg_catalog."default",
     description text COLLATE pg_catalog."default",
     -- If null, indicates a system role
-    organization_id uuid REFERENCES public.organizations (id) MATCH SIMPLE
+    organization_id uuid REFERENCES authz.organizations (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
     updated_at timestamp without time zone,
@@ -83,12 +96,12 @@ TABLESPACE pg_default;
 
 CREATE TRIGGER roles_timestamps
     BEFORE INSERT OR UPDATE 
-    ON public.roles
+    ON authz.roles
     FOR EACH ROW
-    EXECUTE FUNCTION public.add_timestamps();
+    EXECUTE FUNCTION authz.add_timestamps();
 
 -- Permissions
-CREATE TABLE IF NOT EXISTS public.permissions
+CREATE TABLE IF NOT EXISTS authz.permissions
 (
     id uuid PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
     name text NOT NULL COLLATE pg_catalog."default",
@@ -101,18 +114,18 @@ TABLESPACE pg_default;
 
 CREATE TRIGGER permissions_timestamps
     BEFORE INSERT OR UPDATE 
-    ON public.permissions
+    ON authz.permissions
     FOR EACH ROW
-    EXECUTE FUNCTION public.add_timestamps();
+    EXECUTE FUNCTION authz.add_timestamps();
 
 -- Role_Permissions (join)
-CREATE TABLE IF NOT EXISTS public.role_permissions
+CREATE TABLE IF NOT EXISTS authz.role_permissions
 (
     id uuid PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
-    role_id uuid NOT NULL REFERENCES public.roles (id) MATCH SIMPLE
+    role_id uuid NOT NULL REFERENCES authz.roles (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    permission_id uuid NOT NULL REFERENCES public.permissions (id) MATCH SIMPLE
+    permission_id uuid NOT NULL REFERENCES authz.permissions (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
     updated_at timestamp without time zone,
@@ -122,18 +135,18 @@ TABLESPACE pg_default;
 
 CREATE TRIGGER role_permissions_timestamps
     BEFORE INSERT OR UPDATE 
-    ON public.role_permissions
+    ON authz.role_permissions
     FOR EACH ROW
-    EXECUTE FUNCTION public.add_timestamps();
+    EXECUTE FUNCTION authz.add_timestamps();
 
 -- Member_Roles (join)
-CREATE TABLE IF NOT EXISTS public.member_roles
+CREATE TABLE IF NOT EXISTS authz.member_roles
 (
     id uuid PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
-    role_id uuid NOT NULL REFERENCES public.roles (id) MATCH SIMPLE
+    role_id uuid NOT NULL REFERENCES authz.roles (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    member_id uuid NOT NULL REFERENCES public.members (id) MATCH SIMPLE
+    member_id uuid NOT NULL REFERENCES authz.members (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
     updated_at timestamp without time zone,
@@ -143,18 +156,18 @@ TABLESPACE pg_default;
 
 CREATE TRIGGER member_roles_timestamps
     BEFORE INSERT OR UPDATE 
-    ON public.member_roles
+    ON authz.member_roles
     FOR EACH ROW
-    EXECUTE FUNCTION public.add_timestamps();
+    EXECUTE FUNCTION authz.add_timestamps();
 
 
 -- Groups
-CREATE TABLE IF NOT EXISTS public.groups
+CREATE TABLE IF NOT EXISTS authz.groups
 (
     id uuid PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
     name text NOT NULL COLLATE pg_catalog."default",
     description text NOT NULL COLLATE pg_catalog."default" DEFAULT '',
-    organization_id uuid NOT NULL REFERENCES public.organizations (id) MATCH SIMPLE
+    organization_id uuid NOT NULL REFERENCES authz.organizations (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
     updated_at timestamp without time zone,
@@ -162,22 +175,22 @@ CREATE TABLE IF NOT EXISTS public.groups
 )
 TABLESPACE pg_default;
 
-CREATE INDEX public_groups_org_id ON public.groups(organization_id);
+CREATE INDEX public_groups_org_id ON authz.groups(organization_id);
 
 CREATE TRIGGER groups_timestamps
     BEFORE INSERT OR UPDATE 
-    ON public.groups
+    ON authz.groups
     FOR EACH ROW
-    EXECUTE FUNCTION public.add_timestamps();
+    EXECUTE FUNCTION authz.add_timestamps();
 
 -- Group Roles
-CREATE TABLE IF NOT EXISTS public.group_roles
+CREATE TABLE IF NOT EXISTS authz.group_roles
 (
     id uuid PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
-    role_id uuid NOT NULL REFERENCES public.roles (id) MATCH SIMPLE
+    role_id uuid NOT NULL REFERENCES authz.roles (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    group_id uuid NOT NULL REFERENCES public.groups (id) MATCH SIMPLE
+    group_id uuid NOT NULL REFERENCES authz.groups (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
     updated_at timestamp without time zone,
@@ -188,18 +201,18 @@ TABLESPACE pg_default;
 
 CREATE TRIGGER group_roles_timestamps
     BEFORE INSERT OR UPDATE 
-    ON public.group_roles
+    ON authz.group_roles
     FOR EACH ROW
-    EXECUTE FUNCTION public.add_timestamps();
+    EXECUTE FUNCTION authz.add_timestamps();
 
 -- Group Members
-CREATE TABLE IF NOT EXISTS public.group_members
+CREATE TABLE IF NOT EXISTS authz.group_members
 (
     id uuid PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
-    group_id uuid NOT NULL REFERENCES public.groups (id) MATCH SIMPLE
+    group_id uuid NOT NULL REFERENCES authz.groups (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    member_id uuid NOT NULL REFERENCES public.members (id) MATCH SIMPLE
+    member_id uuid NOT NULL REFERENCES authz.members (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
     updated_at timestamp without time zone,
@@ -210,9 +223,9 @@ TABLESPACE pg_default;
 
 CREATE TRIGGER group_members_timestamps
     BEFORE INSERT OR UPDATE 
-    ON public.group_members
+    ON authz.group_members
     FOR EACH ROW
-    EXECUTE FUNCTION public.add_timestamps();
+    EXECUTE FUNCTION authz.add_timestamps();
 
 -- 
 -- Functions
@@ -226,7 +239,7 @@ CREATE TRIGGER group_members_timestamps
 -- 
 -- Get all permissions in an organization
 -- 
-CREATE OR REPLACE FUNCTION public.get_permissions_in_organization(
+CREATE OR REPLACE FUNCTION authz.get_permissions_in_organization(
     organization_id uuid
 	)
     RETURNS SETOF text
@@ -235,7 +248,7 @@ CREATE OR REPLACE FUNCTION public.get_permissions_in_organization(
     STABLE SECURITY DEFINER 
     PARALLEL UNSAFE
     ROWS 1000
-    SET search_path=public
+    SET search_path=authz
 AS $BODY$
     SELECT p.slug
       FROM permissions p
@@ -255,16 +268,16 @@ AS $BODY$
       )
 $BODY$;
 
-ALTER FUNCTION public.get_permissions_in_organization(organization_id uuid)
+ALTER FUNCTION authz.get_permissions_in_organization(organization_id uuid)
     OWNER TO CURRENT_ROLE;
 
-REVOKE ALL ON FUNCTION public.get_permissions_in_organization(organization_id uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.get_permissions_in_organization(organization_id uuid) TO authenticated;
+REVOKE ALL ON FUNCTION authz.get_permissions_in_organization(organization_id uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.get_permissions_in_organization(organization_id uuid) TO authenticated;
 
 -- 
 -- Check if authenticated user has permission in an organization.
 -- 
-CREATE OR REPLACE FUNCTION public.has_permission_in_organization(
+CREATE OR REPLACE FUNCTION authz.has_permission_in_organization(
     organization_id uuid,
     permission text
 	)
@@ -272,23 +285,23 @@ CREATE OR REPLACE FUNCTION public.has_permission_in_organization(
     LANGUAGE 'sql'
     COST 100
     STABLE SECURITY DEFINER PARALLEL UNSAFE
-    SET search_path=public
+    SET search_path=authz
 AS $BODY$
     SELECT $2 IN (
-        SELECT public.get_permissions_in_organization($1)
+        SELECT authz.get_permissions_in_organization($1)
     );
 $BODY$;
 
-ALTER FUNCTION public.has_permission_in_organization(organization_id uuid, permission text)
+ALTER FUNCTION authz.has_permission_in_organization(organization_id uuid, permission text)
     OWNER TO CURRENT_ROLE;
 
-REVOKE ALL ON FUNCTION public.has_permission_in_organization(organization_id uuid, permission text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.has_permission_in_organization(organization_id uuid, permission text) TO authenticated;
+REVOKE ALL ON FUNCTION authz.has_permission_in_organization(organization_id uuid, permission text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.has_permission_in_organization(organization_id uuid, permission text) TO authenticated;
 
 -- 
 -- Check if the authenticated user's permissions overlaps with any one of a list of permissions.
 -- 
-CREATE OR REPLACE FUNCTION public.has_any_permission_in_organization(
+CREATE OR REPLACE FUNCTION authz.has_any_permission_in_organization(
     organization_id uuid,
     permission text[]
 	)
@@ -296,28 +309,28 @@ CREATE OR REPLACE FUNCTION public.has_any_permission_in_organization(
     LANGUAGE 'plpgsql'
     COST 100
     STABLE SECURITY DEFINER PARALLEL UNSAFE
-    SET search_path=public
+    SET search_path=authz
 AS $BODY$
     DECLARE
         has_permission boolean;
     BEGIN
         has_permission = $2 && (
-            SELECT public.get_permissions_in_organization($1)
+            SELECT authz.get_permissions_in_organization($1)
         );
         return has_permission;
     END;
 $BODY$;
 
-ALTER FUNCTION public.has_any_permission_in_organization(organization_id uuid, permission text[])
+ALTER FUNCTION authz.has_any_permission_in_organization(organization_id uuid, permission text[])
     OWNER TO CURRENT_ROLE;
 
-REVOKE ALL ON FUNCTION public.has_any_permission_in_organization(organization_id uuid, permission text[]) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.has_any_permission_in_organization(organization_id uuid, permission text[]) TO authenticated;
+REVOKE ALL ON FUNCTION authz.has_any_permission_in_organization(organization_id uuid, permission text[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.has_any_permission_in_organization(organization_id uuid, permission text[]) TO authenticated;
 
 -- 
 -- Check if authenticted user has a list of permissions.
 -- 
-CREATE OR REPLACE FUNCTION public.has_all_permissions_in_organization(
+CREATE OR REPLACE FUNCTION authz.has_all_permissions_in_organization(
     organization_id uuid,
     permission text[]
 	)
@@ -325,50 +338,50 @@ CREATE OR REPLACE FUNCTION public.has_all_permissions_in_organization(
     LANGUAGE 'plpgsql'
     COST 100
     STABLE SECURITY DEFINER PARALLEL UNSAFE
-    SET search_path=public
+    SET search_path=authz
 AS $BODY$
     DECLARE
         has_permission boolean;
     BEGIN
         has_permission = $2 <@ (
-            SELECT public.get_permissions_in_organization($1)
+            SELECT authz.get_permissions_in_organization($1)
         );
         return has_permission;
     END;
 $BODY$;
 
-ALTER FUNCTION public.has_all_permissions_in_organization(organization_id uuid, permission text[])
+ALTER FUNCTION authz.has_all_permissions_in_organization(organization_id uuid, permission text[])
     OWNER TO CURRENT_ROLE;
 
-REVOKE ALL ON FUNCTION public.has_all_permissions_in_organization(organization_id uuid, permission text[]) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.has_all_permissions_in_organization(organization_id uuid, permission text[]) TO authenticated;
+REVOKE ALL ON FUNCTION authz.has_all_permissions_in_organization(organization_id uuid, permission text[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.has_all_permissions_in_organization(organization_id uuid, permission text[]) TO authenticated;
 
 -- 
 -- Check if user has group membership
 -- 
-CREATE OR REPLACE FUNCTION public.has_group_membership(group_id uuid)
+CREATE OR REPLACE FUNCTION authz.has_group_membership(group_id uuid)
     RETURNS boolean
     LANGUAGE 'sql'
     STABLE SECURITY DEFINER PARALLEL UNSAFE
-    SET search_path=public
+    SET search_path=authz
 AS $BODY$
     SElECT EXISTS(
         SELECT 1 FROM group_members gm
-            LEFT JOIN public.members m ON m.id = gm.member_id
+            LEFT JOIN authz.members m ON m.id = gm.member_id
             WHERE gm.id = group_id AND m.user_id = auth.uid()
     )
 $BODY$;
 
-ALTER FUNCTION public.has_group_membership(group_id uuid)
+ALTER FUNCTION authz.has_group_membership(group_id uuid)
     OWNER TO CURRENT_ROLE;
 
-REVOKE ALL ON FUNCTION public.has_group_membership(group_id uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.has_group_membership(group_id uuid) TO authenticated;
+REVOKE ALL ON FUNCTION authz.has_group_membership(group_id uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.has_group_membership(group_id uuid) TO authenticated;
 
 -- 
 -- Check if the role is available to the designated organization
 -- 
-CREATE OR REPLACE FUNCTION public.role_available_in_organization(
+CREATE OR REPLACE FUNCTION authz.role_available_in_organization(
     role_id uuid,
     organization_id uuid
 	)
@@ -376,73 +389,73 @@ CREATE OR REPLACE FUNCTION public.role_available_in_organization(
     LANGUAGE 'plpgsql'
     COST 100
     STABLE SECURITY DEFINER PARALLEL UNSAFE
-    SET search_path=public
+    SET search_path=authz
 AS $BODY$
     DECLARE
         role_organization_id uuid;
     BEGIN
-        SELECT r.organization_id  FROM public.roles r 
+        SELECT r.organization_id  FROM authz.roles r 
             INTO role_organization_id
             WHERE r.id = role_id;
         return (organization_id IS NULL OR organization_id = role_organization_id);
     END;
 $BODY$;
 
-ALTER FUNCTION public.role_available_in_organization(role_id uuid, organization_id uuid)
+ALTER FUNCTION authz.role_available_in_organization(role_id uuid, organization_id uuid)
     OWNER TO CURRENT_ROLE;
 
-REVOKE ALL ON FUNCTION public.role_available_in_organization(role_id uuid, organization_id uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.role_available_in_organization(role_id uuid, organization_id uuid) TO authenticated;
+REVOKE ALL ON FUNCTION authz.role_available_in_organization(role_id uuid, organization_id uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.role_available_in_organization(role_id uuid, organization_id uuid) TO authenticated;
 
 -- 
 -- Utility function to insert permissions and associated to roles
 -- 
 -- 
-CREATE OR REPLACE FUNCTION public.insert_role_permission(role_slugs text[], name text, permission_slug text, description text)
+CREATE OR REPLACE FUNCTION authz.insert_role_permission(role_slugs text[], name text, permission_slug text, description text)
   RETURNS void
-  SET search_path=public
+  SET search_path=authz
 AS $$
 DECLARE                                                     
   role_name text;  
   permission_id uuid;
 BEGIN
     WITH permission AS (
-        INSERT INTO public.permissions (name, slug, description) 
+        INSERT INTO authz.permissions (name, slug, description) 
             VALUES ($2, $3, $4) 
             RETURNING id
     ) SELECT permission.id FROM permission INTO permission_id;
     FOREACH role_name IN ARRAY $1
     LOOP
-        INSERT INTO public.role_permissions (role_id, permission_id) 
+        INSERT INTO authz.role_permissions (role_id, permission_id) 
             VALUES (
-                (SELECT id FROM public.roles r WHERE r.slug = role_name),
+                (SELECT id FROM authz.roles r WHERE r.slug = role_name),
                 permission_id
             );
     END LOOP;
 
     -- Add all permissions to the 'super-admin'
-    INSERT INTO public.role_permissions (role_id, permission_id) 
+    INSERT INTO authz.role_permissions (role_id, permission_id) 
         VALUES (
-            (SELECT id FROM public.roles r WHERE r.slug = 'super-admin'),
+            (SELECT id FROM authz.roles r WHERE r.slug = 'super-admin'),
             permission_id
         );
 END;
 $$
 LANGUAGE plpgsql;
 
-ALTER FUNCTION public.insert_role_permission(role_slugs text[], name text, permission_slug text, description text)
+ALTER FUNCTION authz.insert_role_permission(role_slugs text[], name text, permission_slug text, description text)
     OWNER TO CURRENT_ROLE;
 
-REVOKE ALL ON FUNCTION public.insert_role_permission(role_slugs text[], name text, permission_slug text, description text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.insert_role_permission(role_slugs text[], name text, permission_slug text, description text) TO CURRENT_ROLE;
+REVOKE ALL ON FUNCTION authz.insert_role_permission(role_slugs text[], name text, permission_slug text, description text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.insert_role_permission(role_slugs text[], name text, permission_slug text, description text) TO CURRENT_ROLE;
 
 -- 
 -- Create organization, and assign initial role to creating user
 -- 
-CREATE OR REPLACE FUNCTION public.create_organization(name text)
-  RETURNS organizations
+CREATE OR REPLACE FUNCTION authz.create_organization(name text)
+  RETURNS authz.organizations
   LANGUAGE 'plpgsql'
-  SECURITY DEFINER SET search_path = public
+  SECURITY DEFINER SET search_path=authz
   AS $BODY$
   DECLARE
     organization_id uuid = gen_random_uuid();
@@ -451,248 +464,284 @@ CREATE OR REPLACE FUNCTION public.create_organization(name text)
   BEGIN
 
     -- create the organization
-    INSERT INTO public.organizations(id, name)
+    INSERT INTO authz.organizations(id, name)
       VALUES(organization_id, name);
 
     --   create membership in the organization
-    INSERT INTO public.members(id, organization_id, user_id)
+    INSERT INTO authz.members(id, organization_id, user_id)
       VALUES(member_id, organization_id, auth.uid());
 
     --   make the creator the owner in the new org
-    INSERT  INTO public.member_roles(role_id, member_id)
+    INSERT  INTO authz.member_roles(role_id, member_id)
       VALUES(
-        (SELECT id FROM public.roles r WHERE r.slug = 'owner'),
+        (SELECT id FROM authz.roles r WHERE r.slug = 'owner'),
         member_id
       );
-    SELECT * FROM public.organizations INTO organization WHERE id = organization_id;
+    SELECT * FROM authz.organizations INTO organization WHERE id = organization_id;
     return organization;
   END;
 $BODY$;
 
-ALTER FUNCTION public.create_organization(name text)
+ALTER FUNCTION authz.create_organization(name text)
     OWNER TO CURRENT_ROLE;
 
-REVOKE ALL ON FUNCTION public.create_organization(name text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.create_organization(name text) TO authenticated;
+REVOKE ALL ON FUNCTION authz.create_organization(name text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.create_organization(name text) TO authenticated;
  
+
+-- 
+-- Set the user's active organization
+-- 
+CREATE OR REPLACE FUNCTION authz.set_active_organization(active_organization_id uuid)
+    RETURNS "text"
+    LANGUAGE "plpgsql"
+    SECURITY DEFINER 
+    SET search_path=authz
+    AS $$
+    DECLARE
+        is_member boolean;
+    BEGIN
+
+        SElECT EXISTS(
+            SELECT 1 FROM members m
+                WHERE m.user_id = auth.uid() AND m.organization_id = active_organization_id
+        ) INTO is_member;
+        IF is_member = TRUE THEN
+            UPDATE auth.users SET raw_app_meta_data = 
+            raw_app_meta_data || 
+                json_build_object('organization', active_organization_id)::jsonb where id = auth.uid();
+            RETURN 'OK';
+        END IF;
+        
+        RAISE EXCEPTION 'User is not member of organization --> %', active_organization_id
+            USING HINT = 'Please check your organization ID';
+    END;
+$$;
+
+ALTER FUNCTION authz.set_active_organization(active_organization_id uuid)
+    OWNER TO CURRENT_ROLE;
+
+REVOKE ALL ON FUNCTION authz.set_active_organization(active_organization_id uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.set_active_organization(active_organization_id uuid) TO authenticated;
+
 -- 
 -- RLS
 -- 
 
 -- Organizations
-ALTER TABLE IF EXISTS public.organizations
+ALTER TABLE IF EXISTS authz.organizations
     OWNER to CURRENT_ROLE;
 
-REVOKE ALL ON TABLE public.organizations FROM PUBLIC;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.organizations TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.organizations TO service_role;
-GRANT ALL ON TABLE public.organizations TO CURRENT_ROLE;
+REVOKE ALL ON TABLE authz.organizations FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE authz.organizations TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE authz.organizations TO service_role;
+GRANT ALL ON TABLE authz.organizations TO CURRENT_ROLE;
 
-ALTER TABLE IF EXISTS public.organizations
+ALTER TABLE IF EXISTS authz.organizations
     ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Require `select-organization` in org"
-    ON public.organizations 
+    ON authz.organizations 
     AS PERMISSIVE
     FOR SELECT
     TO authenticated
-    USING ( public.has_permission_in_organization(organizations.id, 'select-organization') );
+    USING ( authz.has_permission_in_organization(organizations.id, 'select-organization') );
 
 CREATE POLICY "Users can create organizations"
-    ON public.organizations 
+    ON authz.organizations 
     AS PERMISSIVE
     FOR INSERT
     TO public
     WITH CHECK ( auth.uid() IS NOT NULL );
 
 CREATE POLICY "Require `delete-organization` in org"
-    ON public.organizations 
+    ON authz.organizations 
     AS PERMISSIVE
     FOR DELETE
     TO authenticated
-    USING ( public.has_permission_in_organization(organizations.id, 'delete-organization') );
+    USING ( authz.has_permission_in_organization(organizations.id, 'delete-organization') );
 
 CREATE POLICY "Require `edit-organization` in org"
-    ON public.organizations 
+    ON authz.organizations 
     AS PERMISSIVE
     FOR UPDATE
     TO authenticated
-    USING ( public.has_permission_in_organization(organizations.id, 'edit-organization') )
-    WITH CHECK ( public.has_permission_in_organization(organizations.id, 'edit-organization') );
+    USING ( authz.has_permission_in_organization(organizations.id, 'edit-organization') )
+    WITH CHECK ( authz.has_permission_in_organization(organizations.id, 'edit-organization') );
 
 -- Members
-ALTER TABLE IF EXISTS public.members
+ALTER TABLE IF EXISTS authz.members
     OWNER to CURRENT_ROLE;
 
-ALTER TABLE IF EXISTS public.members
+ALTER TABLE IF EXISTS authz.members
     ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON TABLE public.members FROM PUBLIC;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.members TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.members TO service_role;
-GRANT ALL ON TABLE public.members TO CURRENT_ROLE;
+REVOKE ALL ON TABLE authz.members FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE authz.members TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE authz.members TO service_role;
+GRANT ALL ON TABLE authz.members TO CURRENT_ROLE;
 
 CREATE POLICY "Requires permission `select-member` to select member"
-    ON public.members 
+    ON authz.members 
     AS PERMISSIVE
     FOR SELECT
     TO public
-    USING ( public.has_permission_in_organization(members.organization_id, 'select-member') );
+    USING ( authz.has_permission_in_organization(members.organization_id, 'select-member') );
 
 CREATE POLICY "Requires permission `add-member` to add member"
-    ON public.members 
+    ON authz.members 
     AS PERMISSIVE
     FOR INSERT
     TO public
-    WITH CHECK ( public.has_permission_in_organization(members.organization_id, 'add-member') );
+    WITH CHECK ( authz.has_permission_in_organization(members.organization_id, 'add-member') );
 
 CREATE POLICY "Requires permission `delete-member` to remove member"
-    ON public.members
+    ON authz.members
     AS PERMISSIVE
     FOR DELETE
     TO public
-    USING ( public.has_permission_in_organization(members.organization_id, 'delete-member') );
+    USING ( authz.has_permission_in_organization(members.organization_id, 'delete-member') );
 
 CREATE POLICY "Requires permission `edit-member` to update member"
-    ON public.members 
+    ON authz.members 
     AS PERMISSIVE
     FOR UPDATE
     TO public
-    USING ( public.has_permission_in_organization(members.organization_id, 'edit-member') )
-    WITH CHECK ( public.has_permission_in_organization(members.organization_id, 'edit-member') );
+    USING ( authz.has_permission_in_organization(members.organization_id, 'edit-member') )
+    WITH CHECK ( authz.has_permission_in_organization(members.organization_id, 'edit-member') );
 
 -- Member Roles (join)
-ALTER TABLE IF EXISTS public.member_roles
+ALTER TABLE IF EXISTS authz.member_roles
     OWNER to CURRENT_ROLE;
 
-ALTER TABLE IF EXISTS public.member_roles
+ALTER TABLE IF EXISTS authz.member_roles
     ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON TABLE public.member_roles FROM PUBLIC;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.member_roles TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.member_roles TO service_role;
-GRANT ALL ON TABLE public.member_roles TO CURRENT_ROLE;
+REVOKE ALL ON TABLE authz.member_roles FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE authz.member_roles TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE authz.member_roles TO service_role;
+GRANT ALL ON TABLE authz.member_roles TO CURRENT_ROLE;
 
 CREATE POLICY "Requires permission `select-member` to view members role"
-    ON public.member_roles 
+    ON authz.member_roles 
     AS PERMISSIVE
     FOR SELECT
     TO authenticated
     USING (
-        public.has_permission_in_organization(
-        (SELECT organization_id FROM public.members WHERE id = member_roles.member_id),
+        authz.has_permission_in_organization(
+        (SELECT organization_id FROM authz.members WHERE id = member_roles.member_id),
         'select-member'
     )
 );
 
 CREATE POLICY "Require `edit-member` in org"
-    ON public.member_roles 
+    ON authz.member_roles 
     AS PERMISSIVE
     FOR INSERT
     TO authenticated
     WITH CHECK (
-        public.has_permission_in_organization(
-            (SELECT organization_id FROM public.members WHERE id = member_roles.member_id),
+        authz.has_permission_in_organization(
+            (SELECT organization_id FROM authz.members WHERE id = member_roles.member_id),
             'edit-member'
-        ) AND public.role_available_in_organization(
+        ) AND authz.role_available_in_organization(
             member_roles.role_id,
-            (SELECT organization_id FROM public.members WHERE id = member_roles.member_id)
+            (SELECT organization_id FROM authz.members WHERE id = member_roles.member_id)
         )
     );
 
 CREATE POLICY "Requires permission `edit-member` to remove member's role"
-    ON public.member_roles
+    ON authz.member_roles
     AS PERMISSIVE
     FOR DELETE
     TO authenticated
     USING (
-        public.has_permission_in_organization(
-        (SELECT organization_id FROM public.members WHERE id = member_roles.member_id),
+        authz.has_permission_in_organization(
+        (SELECT organization_id FROM authz.members WHERE id = member_roles.member_id),
         'edit-member'
     )
 );
 
 CREATE POLICY "Requires permission `edit-member` to update a member's role"
-    ON public.member_roles 
+    ON authz.member_roles 
     AS PERMISSIVE
     FOR UPDATE
     TO authenticated
     USING (
-        public.has_permission_in_organization(
-            (SELECT organization_id FROM public.members WHERE id = member_roles.member_id),
+        authz.has_permission_in_organization(
+            (SELECT organization_id FROM authz.members WHERE id = member_roles.member_id),
             'edit-member'
         ) AND (
-            public.role_available_in_organization(
+            authz.role_available_in_organization(
                 member_roles.role_id,
-                (SELECT organization_id FROM public.members WHERE id = member_roles.member_id)
+                (SELECT organization_id FROM authz.members WHERE id = member_roles.member_id)
             )
         )
     )
     WITH CHECK (
-        public.has_permission_in_organization(
-            (SELECT organization_id FROM public.members WHERE id = member_roles.member_id),
+        authz.has_permission_in_organization(
+            (SELECT organization_id FROM authz.members WHERE id = member_roles.member_id),
             'edit-member'
         ) AND (
-            public.role_available_in_organization(
+            authz.role_available_in_organization(
                 member_roles.role_id,
-                (SELECT organization_id FROM public.members WHERE id = member_roles.member_id)
+                (SELECT organization_id FROM authz.members WHERE id = member_roles.member_id)
             )
         )
     )
 ;
 
 -- Roles
-ALTER TABLE IF EXISTS public.roles
+ALTER TABLE IF EXISTS authz.roles
     OWNER to postgres;
 
-ALTER TABLE IF EXISTS public.roles
+ALTER TABLE IF EXISTS authz.roles
     ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON TABLE public.roles FROM PUBLIC;
-GRANT SELECT ON TABLE public.roles TO authenticated;
-GRANT SELECT ON TABLE public.roles TO service_role;
-GRANT ALL ON TABLE public.roles TO CURRENT_ROLE;
+REVOKE ALL ON TABLE authz.roles FROM PUBLIC;
+GRANT SELECT ON TABLE authz.roles TO authenticated;
+GRANT SELECT ON TABLE authz.roles TO service_role;
+GRANT ALL ON TABLE authz.roles TO CURRENT_ROLE;
 
 CREATE POLICY "Authenticated and service roles can select roles"
-    ON public.roles 
+    ON authz.roles 
     AS PERMISSIVE
     FOR SELECT
     TO authenticated, service_role
     USING ( roles.organization_id IS NULL );
 
 CREATE POLICY "Require `select-role` in org"
-    ON public.roles 
+    ON authz.roles 
     AS PERMISSIVE
     FOR SELECT
     TO authenticated
     USING ( 
-        public.has_permission_in_organization(
+        authz.has_permission_in_organization(
             roles.organization_id,
             'select-role'
         )
     );
 
 CREATE POLICY "Only `CURRENT_ROLE` can insert system roles"
-    ON public.roles 
+    ON authz.roles 
     AS PERMISSIVE
     FOR INSERT
     TO CURRENT_ROLE
     WITH CHECK ( roles.organization_id IS NULL );
 
 CREATE POLICY "Require `insert-role` in org"
-    ON public.roles 
+    ON authz.roles 
     AS PERMISSIVE
     FOR INSERT
     TO authenticated
     WITH CHECK ( 
-        public.has_permission_in_organization(
+        authz.has_permission_in_organization(
             roles.organization_id,
             'insert-role'
         )
     );
 
 CREATE POLICY "Only `CURRENT_ROLE` can updat system roles"
-    ON public.roles 
+    ON authz.roles 
     AS PERMISSIVE
     FOR UPDATE
     TO CURRENT_ROLE
@@ -700,70 +749,70 @@ CREATE POLICY "Only `CURRENT_ROLE` can updat system roles"
     WITH CHECK ( roles.organization_id IS NULL );
 
 CREATE POLICY "Require `update-role` in org"
-    ON public.roles 
+    ON authz.roles 
     AS PERMISSIVE
     FOR UPDATE
     TO CURRENT_ROLE
     USING ( 
-        public.has_permission_in_organization(
+        authz.has_permission_in_organization(
             roles.organization_id,
             'edit-role'
         )
      )
     WITH CHECK ( 
-        public.has_permission_in_organization(
+        authz.has_permission_in_organization(
             roles.organization_id,
             'edit-role'
         )
      );
 
 CREATE POLICY "Only `CURRENT_ROLE` can delete system roles"
-    ON public.roles 
+    ON authz.roles 
     AS PERMISSIVE
     FOR DELETE
     TO CURRENT_ROLE
     USING ( roles.organization_id IS NULL );
 
 CREATE POLICY "Require `delete-role` in org"
-    ON public.roles 
+    ON authz.roles 
     AS PERMISSIVE
     FOR DELETE
     TO authenticated
     USING ( 
-        public.has_permission_in_organization(
+        authz.has_permission_in_organization(
             roles.organization_id,
             'delete-role'
         )
      );
 
 -- Permissions
-ALTER TABLE IF EXISTS public.permissions
+ALTER TABLE IF EXISTS authz.permissions
     OWNER to CURRENT_ROLE;
 
-ALTER TABLE IF EXISTS public.permissions
+ALTER TABLE IF EXISTS authz.permissions
     ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON TABLE public.permissions FROM PUBLIC;
-GRANT SELECT ON TABLE public.permissions TO authenticated;
-GRANT SELECT ON TABLE public.permissions TO service_role;
-GRANT ALL ON TABLE public.permissions TO CURRENT_ROLE;
+REVOKE ALL ON TABLE authz.permissions FROM PUBLIC;
+GRANT SELECT ON TABLE authz.permissions TO authenticated;
+GRANT SELECT ON TABLE authz.permissions TO service_role;
+GRANT ALL ON TABLE authz.permissions TO CURRENT_ROLE;
 
 CREATE POLICY "Permission select permissions"
-    ON public.permissions 
+    ON authz.permissions 
     AS PERMISSIVE
     FOR SELECT
     TO CURRENT_ROLE, authenticated, service_role
     USING ( true );
 
 CREATE POLICY "Only `CURRENT_ROLE` can insert permissions"
-    ON public.permissions 
+    ON authz.permissions 
     AS PERMISSIVE
     FOR INSERT
     TO CURRENT_ROLE
     WITH CHECK ( true );
 
 CREATE POLICY "Only `CURRENT_ROLE` can update permissions"
-    ON public.permissions 
+    ON authz.permissions 
     AS PERMISSIVE
     FOR UPDATE
     TO CURRENT_ROLE
@@ -771,180 +820,180 @@ CREATE POLICY "Only `CURRENT_ROLE` can update permissions"
     WITH CHECK ( true );
 
 CREATE POLICY "Only `CURRENT_ROLE` can delete permissions"
-    ON public.permissions 
+    ON authz.permissions 
     AS PERMISSIVE
     FOR DELETE
     TO CURRENT_ROLE
     USING ( true );
 
 -- Role Permissions (join)
-ALTER TABLE IF EXISTS public.role_permissions
+ALTER TABLE IF EXISTS authz.role_permissions
     OWNER to postgres;
 
-ALTER TABLE IF EXISTS public.role_permissions
+ALTER TABLE IF EXISTS authz.role_permissions
     ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON TABLE public.role_permissions FROM PUBLIC;
-GRANT SELECT ON TABLE public.role_permissions TO authenticated;
-GRANT SELECT ON TABLE public.role_permissions TO service_role;
-GRANT ALL ON TABLE public.role_permissions TO CURRENT_ROLE;
+REVOKE ALL ON TABLE authz.role_permissions FROM PUBLIC;
+GRANT SELECT ON TABLE authz.role_permissions TO authenticated;
+GRANT SELECT ON TABLE authz.role_permissions TO service_role;
+GRANT ALL ON TABLE authz.role_permissions TO CURRENT_ROLE;
 
 CREATE POLICY "Permissive select for system role_permissions"
-    ON public.role_permissions 
+    ON authz.role_permissions 
     AS PERMISSIVE
     FOR SELECT
     TO CURRENT_ROLE, authenticated, service_role
     USING ( 
-        (SELECT organization_id FROM public.roles WHERE id = role_permissions.role_id) IS NULL
+        (SELECT organization_id FROM authz.roles WHERE id = role_permissions.role_id) IS NULL
      );
 
 CREATE POLICY "Select requires `select-role` in org"
-    ON public.role_permissions 
+    ON authz.role_permissions 
     AS PERMISSIVE
     FOR SELECT
     TO authenticated
     USING ( 
-        public.has_permission_in_organization(
-            (SELECT organization_id FROM public.roles WHERE id = role_permissions.role_id),
+        authz.has_permission_in_organization(
+            (SELECT organization_id FROM authz.roles WHERE id = role_permissions.role_id),
             'select-role'
         )
      );
 
 CREATE POLICY "Only `CURRENT_ROLE` can insert system role_permissions"
-    ON public.role_permissions 
+    ON authz.role_permissions 
     AS PERMISSIVE
     FOR INSERT
     TO CURRENT_ROLE
     WITH CHECK ( 
-        (SELECT organization_id FROM public.roles WHERE id = role_permissions.role_id) IS NULL
+        (SELECT organization_id FROM authz.roles WHERE id = role_permissions.role_id) IS NULL
      );
 
 CREATE POLICY "Insert requires `edit-role` in org"
-    ON public.role_permissions 
+    ON authz.role_permissions 
     AS PERMISSIVE
     FOR INSERT
     TO authenticated
     WITH CHECK ( 
-        public.has_permission_in_organization(
-            (SELECT organization_id FROM public.roles WHERE id = role_permissions.role_id),
+        authz.has_permission_in_organization(
+            (SELECT organization_id FROM authz.roles WHERE id = role_permissions.role_id),
             'edit-role'
         )
      );
 
 CREATE POLICY "Only `CURRENT_ROLE` can update system role_permissions"
-    ON public.role_permissions 
+    ON authz.role_permissions 
     AS PERMISSIVE
     FOR UPDATE
     TO CURRENT_ROLE
     USING ( 
-        (SELECT organization_id FROM public.roles WHERE id = role_permissions.role_id) IS NULL
+        (SELECT organization_id FROM authz.roles WHERE id = role_permissions.role_id) IS NULL
      )
     WITH CHECK ( 
-        (SELECT organization_id FROM public.roles WHERE id = role_permissions.role_id) IS NULL
+        (SELECT organization_id FROM authz.roles WHERE id = role_permissions.role_id) IS NULL
      );
 
 CREATE POLICY "Update requires `edit-role` in org"
-    ON public.role_permissions 
+    ON authz.role_permissions 
     AS PERMISSIVE
     FOR UPDATE
     TO authenticated
     USING (
-        public.has_permission_in_organization(
-            (SELECT organization_id FROM public.roles WHERE id = role_permissions.role_id),
+        authz.has_permission_in_organization(
+            (SELECT organization_id FROM authz.roles WHERE id = role_permissions.role_id),
             'edit-role'
         )
     )
     WITH CHECK ( 
-        public.has_permission_in_organization(
-            (SELECT organization_id FROM public.roles WHERE id = role_permissions.role_id),
+        authz.has_permission_in_organization(
+            (SELECT organization_id FROM authz.roles WHERE id = role_permissions.role_id),
             'edit-role'
         )
      );
 
 CREATE POLICY "Only `CURRENT_ROLE` can delete system role_permissions"
-    ON public.role_permissions 
+    ON authz.role_permissions 
     AS PERMISSIVE
     FOR DELETE
     TO CURRENT_ROLE
     USING ( 
-        (SELECT organization_id FROM public.roles WHERE id = role_permissions.role_id) IS NULL
+        (SELECT organization_id FROM authz.roles WHERE id = role_permissions.role_id) IS NULL
      );
 
 CREATE POLICY "Delete require `edit-role` in org"
-    ON public.role_permissions 
+    ON authz.role_permissions 
     AS PERMISSIVE
     FOR DELETE
     TO authenticated
     USING (
-        public.has_permission_in_organization(
-            (SELECT organization_id FROM public.roles WHERE id = role_permissions.role_id),
+        authz.has_permission_in_organization(
+            (SELECT organization_id FROM authz.roles WHERE id = role_permissions.role_id),
             'edit-role'
         )
     );
 
 
 -- Groups
-ALTER TABLE IF EXISTS public.groups
+ALTER TABLE IF EXISTS authz.groups
     OWNER to CURRENT_ROLE;
 
-ALTER TABLE IF EXISTS public.groups
+ALTER TABLE IF EXISTS authz.groups
     ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON TABLE public.groups FROM PUBLIC;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.groups TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.groups TO service_role;
-GRANT ALL ON TABLE public.groups TO CURRENT_ROLE;
+REVOKE ALL ON TABLE authz.groups FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE authz.groups TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE authz.groups TO service_role;
+GRANT ALL ON TABLE authz.groups TO CURRENT_ROLE;
 
 CREATE POLICY "Require `select-group` OR membership"
-    ON public.groups 
+    ON authz.groups 
     AS PERMISSIVE
     FOR SELECT
     TO authenticated
     USING (
-        public.has_group_membership(groups.id) OR
-        public.has_permission_in_organization(
+        authz.has_group_membership(groups.id) OR
+        authz.has_permission_in_organization(
             groups.organization_id,
             'select-group'
         )        
 );
 
 CREATE POLICY "Require `add-group` in org"
-    ON public.groups 
+    ON authz.groups 
     AS PERMISSIVE
     FOR INSERT
     TO authenticated
     WITH CHECK (
-        public.has_permission_in_organization(
+        authz.has_permission_in_organization(
             groups.organization_id,
             'add-group'
         )
     );
 
 CREATE POLICY "Require `delete-group` in org"
-    ON public.groups
+    ON authz.groups
     AS PERMISSIVE
     FOR DELETE
     TO authenticated
     USING (
-        public.has_permission_in_organization(
+        authz.has_permission_in_organization(
             groups.organization_id,
             'delete-member'
     )
 );
 
 CREATE POLICY "Require `edit-group` in org"
-    ON public.groups 
+    ON authz.groups 
     AS PERMISSIVE
     FOR UPDATE
     TO authenticated
     USING (
-        public.has_permission_in_organization(
+        authz.has_permission_in_organization(
             groups.organization_id,
             'edit-group'
         )
     )
     WITH CHECK (
-        public.has_permission_in_organization(
+        authz.has_permission_in_organization(
             groups.organization_id,
             'edit-group'
         )
@@ -952,153 +1001,153 @@ CREATE POLICY "Require `edit-group` in org"
 ;
 
 -- Groups Members (join)
-ALTER TABLE IF EXISTS public.group_members
+ALTER TABLE IF EXISTS authz.group_members
     OWNER to CURRENT_ROLE;
 
-ALTER TABLE IF EXISTS public.group_members
+ALTER TABLE IF EXISTS authz.group_members
     ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON TABLE public.group_members FROM PUBLIC;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.group_members TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.group_members TO service_role;
-GRANT ALL ON TABLE public.group_members TO CURRENT_ROLE;
+REVOKE ALL ON TABLE authz.group_members FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE authz.group_members TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE authz.group_members TO service_role;
+GRANT ALL ON TABLE authz.group_members TO CURRENT_ROLE;
 
 CREATE POLICY "Require `select-group` OR membership"
-    ON public.group_members 
+    ON authz.group_members 
     AS PERMISSIVE
     FOR SELECT
     TO authenticated
     USING (
-        public.has_group_membership(group_members.group_id) OR 
-        public.has_permission_in_organization(
-            (SELECT organization_id FROM public.groups g WHERE g.id = group_members.group_id),
+        authz.has_group_membership(group_members.group_id) OR 
+        authz.has_permission_in_organization(
+            (SELECT organization_id FROM authz.groups g WHERE g.id = group_members.group_id),
             'select-group'
     )
 );
 
 CREATE POLICY "Require `edit-group` to add"
-    ON public.group_members 
+    ON authz.group_members 
     AS PERMISSIVE
     FOR INSERT
     TO authenticated
     WITH CHECK (
-        public.has_permission_in_organization(
-            (SELECT organization_id FROM public.groups g WHERE g.id = group_members.group_id),
+        authz.has_permission_in_organization(
+            (SELECT organization_id FROM authz.groups g WHERE g.id = group_members.group_id),
             'edit-group'
         )
     );
 
 CREATE POLICY "Require `edit-group` to delete"
-    ON public.group_members
+    ON authz.group_members
     AS PERMISSIVE
     FOR DELETE
     TO authenticated
     USING (
-        public.has_permission_in_organization(
-            (SELECT organization_id FROM public.groups g WHERE g.id = group_members.group_id),
+        authz.has_permission_in_organization(
+            (SELECT organization_id FROM authz.groups g WHERE g.id = group_members.group_id),
             'edit-group'
         )
     );
 
 CREATE POLICY "Require `edit-group` to update"
-    ON public.group_members 
+    ON authz.group_members 
     AS PERMISSIVE
     FOR UPDATE
     TO authenticated
     USING (
-        public.has_permission_in_organization(
-            (SELECT organization_id FROM public.groups g WHERE g.id = group_members.group_id),
+        authz.has_permission_in_organization(
+            (SELECT organization_id FROM authz.groups g WHERE g.id = group_members.group_id),
             'edit-group'
         )
     )
     WITH CHECK (
-        public.has_permission_in_organization(
-            (SELECT organization_id FROM public.groups g WHERE g.id = group_members.group_id),
+        authz.has_permission_in_organization(
+            (SELECT organization_id FROM authz.groups g WHERE g.id = group_members.group_id),
             'edit-group'
         )
     )
 ;
 
 -- Group Roles
-ALTER TABLE IF EXISTS public.group_roles
+ALTER TABLE IF EXISTS authz.group_roles
     OWNER to CURRENT_ROLE;
 
-ALTER TABLE IF EXISTS public.group_roles
+ALTER TABLE IF EXISTS authz.group_roles
     ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON TABLE public.group_roles FROM PUBLIC;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.group_roles TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.group_roles TO service_role;
-GRANT ALL ON TABLE public.group_roles TO CURRENT_ROLE;
+REVOKE ALL ON TABLE authz.group_roles FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE authz.group_roles TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE authz.group_roles TO service_role;
+GRANT ALL ON TABLE authz.group_roles TO CURRENT_ROLE;
 
 CREATE POLICY "Require `select-group` / membership"
-    ON public.group_roles 
+    ON authz.group_roles 
     AS PERMISSIVE
     FOR SELECT
     TO authenticated
     USING (
-        public.has_group_membership(group_roles.group_id) OR
-        public.has_permission_in_organization(
-            (SELECT organization_id FROM public.groups g WHERE g.id = group_roles.group_id),
+        authz.has_group_membership(group_roles.group_id) OR
+        authz.has_permission_in_organization(
+            (SELECT organization_id FROM authz.groups g WHERE g.id = group_roles.group_id),
             'select-group'
     )
 );
 
 CREATE POLICY "Require `edit-group` to add"
-    ON public.group_roles 
+    ON authz.group_roles 
     AS PERMISSIVE
     FOR INSERT
     TO authenticated
     WITH CHECK (
-        public.has_permission_in_organization(
-            (SELECT organization_id FROM public.groups g WHERE g.id = group_roles.group_id),
+        authz.has_permission_in_organization(
+            (SELECT organization_id FROM authz.groups g WHERE g.id = group_roles.group_id),
             'edit-group'
         ) AND
-        public.role_available_in_organization(
+        authz.role_available_in_organization(
             group_roles.role_id,
-            (SELECT organization_id FROM public.groups g WHERE g.id = group_roles.group_id)
+            (SELECT organization_id FROM authz.groups g WHERE g.id = group_roles.group_id)
         )
     );
 
 CREATE POLICY "Require `edit-group` to delete"
-    ON public.group_roles
+    ON authz.group_roles
     AS PERMISSIVE
     FOR DELETE
     TO authenticated
     USING (
-        public.has_permission_in_organization(
-            (SELECT organization_id FROM public.groups g WHERE g.id = group_roles.group_id),
+        authz.has_permission_in_organization(
+            (SELECT organization_id FROM authz.groups g WHERE g.id = group_roles.group_id),
             'edit-group'
         ) AND
-        public.role_available_in_organization(
+        authz.role_available_in_organization(
             group_roles.role_id,
-            (SELECT organization_id FROM public.groups g WHERE g.id = group_roles.group_id)
+            (SELECT organization_id FROM authz.groups g WHERE g.id = group_roles.group_id)
         )
     );
 
 CREATE POLICY "Require `edit-group` to update"
-    ON public.group_roles 
+    ON authz.group_roles 
     AS PERMISSIVE
     FOR UPDATE
     TO authenticated
     USING (
-        public.has_permission_in_organization(
-            (SELECT organization_id FROM public.groups g WHERE g.id = group_roles.group_id),
+        authz.has_permission_in_organization(
+            (SELECT organization_id FROM authz.groups g WHERE g.id = group_roles.group_id),
             'edit-group'
         ) AND
-        public.role_available_in_organization(
+        authz.role_available_in_organization(
             group_roles.role_id,
-            (SELECT organization_id FROM public.groups g WHERE g.id = group_roles.group_id)
+            (SELECT organization_id FROM authz.groups g WHERE g.id = group_roles.group_id)
         )
     )
     WITH CHECK (
-        public.has_permission_in_organization(
-            (SELECT organization_id FROM public.groups g WHERE g.id = group_roles.group_id),
+        authz.has_permission_in_organization(
+            (SELECT organization_id FROM authz.groups g WHERE g.id = group_roles.group_id),
             'edit-group'
         ) AND
-        public.role_available_in_organization(
+        authz.role_available_in_organization(
             group_roles.role_id,
-            (SELECT organization_id FROM public.groups g WHERE g.id = group_roles.group_id)
+            (SELECT organization_id FROM authz.groups g WHERE g.id = group_roles.group_id)
         )
     )
 ;
@@ -1107,7 +1156,7 @@ CREATE POLICY "Require `edit-group` to update"
 -- 
 -- Create Default Roles 
 -- 
-INSERT INTO public.roles (name, slug, description) VALUES
+INSERT INTO authz.roles (name, slug, description) VALUES
     ('Super Admin', 'super-admin', 'Admin rights over all organizations'),
     ('Owner', 'owner', 'Full ownership rights in the organization'),
     ('Editor' , 'editor', 'Edit records in the organization'),
@@ -1118,19 +1167,19 @@ INSERT INTO public.roles (name, slug, description) VALUES
 --
 
 -- Organizations
-SELECT public.insert_role_permission(
+SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Delete organization',
     'delete-organization',
     'Delete the organization'
 );
-SELECT public.insert_role_permission(
+SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Edit organization',
     'edit-organization',
     'Edit the organization'
 );
-SELECT public.insert_role_permission(
+SELECT authz.insert_role_permission(
     ARRAY['owner', 'editor', 'read-only'],
     'Select organization',
     'select-organization',
@@ -1138,25 +1187,25 @@ SELECT public.insert_role_permission(
 );
 
 -- Members
-SELECT public.insert_role_permission(
+SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Remove member',
     'delete-member',
     'Remove a member from the organization'
 );
-SELECT public.insert_role_permission(
+SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Add member',
     'add-member',
     'Add a member to the organization'
 );
-SELECT public.insert_role_permission(
+SELECT authz.insert_role_permission(
     ARRAY['owner', 'editor', 'read-only'],
     'Edit member',
     'edit-member',
     'Update a member in the organization'
 );
-SELECT public.insert_role_permission(
+SELECT authz.insert_role_permission(
     ARRAY['owner', 'editor', 'read-only'],
     'Select member',
     'select-member',
@@ -1164,25 +1213,25 @@ SELECT public.insert_role_permission(
 );
 
 -- Roles
-SELECT public.insert_role_permission(
+SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Remove role',
     'delete-role',
     'Remove a role'
 );
-SELECT public.insert_role_permission(
+SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Add role',
     'add-role',
     'Add a role to the organization'
 );
-SELECT public.insert_role_permission(
+SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Edit role',
     'edit-role',
     'Update a role in the organization'
 );
-SELECT public.insert_role_permission(
+SELECT authz.insert_role_permission(
     ARRAY['owner', 'editor', 'read-only'],
     'Select role',
     'select-role',
@@ -1190,25 +1239,25 @@ SELECT public.insert_role_permission(
 );
 
 -- Groups
-SELECT public.insert_role_permission(
+SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Remove group',
     'delete-group',
     'Remove a group'
 );
-SELECT public.insert_role_permission(
+SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Add group',
     'add-group',
     'Add a group to the organization'
 );
-SELECT public.insert_role_permission(
+SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Edit group',
     'edit-group',
     'Update a group in the organization'
 );
-SELECT public.insert_role_permission(
+SELECT authz.insert_role_permission(
     ARRAY['owner', 'editor', 'read-only'],
     'Select group',
     'select-group',

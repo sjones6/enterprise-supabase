@@ -21,6 +21,7 @@ export class GroupsClient implements IGroupsClient {
   async create(group: CreateOrUpdateGroup): Promise<Group> {
     return unwrapPostgrestSingleReponse(
       await this.supabase
+        .schema("authz")
         .from("groups")
         .insert(group)
         .returns()
@@ -32,6 +33,7 @@ export class GroupsClient implements IGroupsClient {
   async getById(organizationId: string): Promise<Group> {
     return unwrapPostgrestSingleReponse(
       await this.supabase
+        .schema("authz")
         .from("groups")
         .select()
         .eq("id", organizationId)
@@ -42,7 +44,7 @@ export class GroupsClient implements IGroupsClient {
 
   async list(): Promise<Group[]> {
     return unwrapPostgrestSingleReponse(
-      await this.supabase.from("groups").select().throwOnError()
+      await this.supabase.schema("authz").from("groups").select().throwOnError()
     );
   }
 
@@ -52,6 +54,7 @@ export class GroupsClient implements IGroupsClient {
   ): Promise<Group> {
     return unwrapPostgrestSingleReponse(
       await this.supabase
+        .schema("authz")
         .from("groups")
         .update(group)
         .eq("id", groupId)
@@ -64,6 +67,7 @@ export class GroupsClient implements IGroupsClient {
   async deleteById(groupId: string) {
     return unwrapPostgrestSingleReponse(
       await this.supabase
+        .schema("authz")
         .from("groups")
         .delete()
         .eq("id", groupId)

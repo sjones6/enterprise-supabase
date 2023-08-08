@@ -24,7 +24,7 @@
     "db:reset": "supabase db reset && npm run supabase:types",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
-    "supabase:types": "supabase gen types typescript --local --schema public > src/database.ts && cp src/database.ts ../../apps/example-vite-react/src/lib/database.ts"
+    "supabase:types": "supabase gen types typescript --local --schema authz > src/database.ts && cp src/database.ts ../../apps/example-vite-react/src/lib/database.ts"
   },
   "peerDependencies": {
     "@supabase/supabase-js": "^2.32.0",

@@ -5,6 +5,8 @@ import {
   type EnterpriseSupabaseAPIClient,
   type EnterpriseSupabaseClient,
 } from "enterprise-supabase";
+import { AuthContextProvider } from "./AuthContextProvider";
+import { OrganizationProvider } from "./OrganizationProvider";
 
 const defaultQueryClient = new QueryClient();
 
@@ -28,7 +30,9 @@ export const SupabaseClientProvider = ({
   return (
     <QueryClientProvider client={queryClient}>
       <SupabaseClientProviderContext.Provider value={{ client, apiClient }}>
-        {children}
+        <AuthContextProvider>
+          <OrganizationProvider>{children}</OrganizationProvider>
+        </AuthContextProvider>
       </SupabaseClientProviderContext.Provider>
     </QueryClientProvider>
   );

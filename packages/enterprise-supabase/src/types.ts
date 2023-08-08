@@ -3,7 +3,7 @@ import { Database } from "./database";
 
 export type EnterpriseSupabaseClient = SupabaseClient<Database>;
 
-type Tables = Database["public"]["Tables"];
+type Tables = Database["authz"]["Tables"];
 
 export type Group = Tables["groups"]["Row"];
 export type GroupMember = Tables["group_members"]["Row"];

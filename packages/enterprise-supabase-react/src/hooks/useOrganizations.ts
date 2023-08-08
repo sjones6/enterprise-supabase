@@ -55,6 +55,27 @@ export const useDeleteOrganization = (
   );
 };
 
+export const useSetPrimaryOrganization = (
+  options: UseMutationOptions<unknown, PostgrestError, string> = {}
+) => {
+  const queryClient = useQueryClient();
+  const { organizations } = useEnterpriseSupabaseApiClient();
+  return useMutation(
+    (organizationId: string) =>
+      organizations.setActiveOrganization(organizationId),
+    {
+      onSuccess(data, ctx, vars) {
+        queryClient.invalidateQueries({
+          queryKey: ["enterprise", "organizations"],
+        });
+        options.onSuccess && options.onSuccess(data, ctx, vars);
+      },
+      retry: false,
+      ...options,
+    }
+  );
+};
+
 type UpdateOrganizationVariable = {
   organizationId: string;
   update: CreateOrUpdateOrganization;

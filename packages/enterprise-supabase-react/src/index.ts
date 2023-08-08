@@ -1,6 +1,9 @@
 // Globals
 export * from "./context/SupabaseClientProvider";
 
+// General
+export * from "./components/OrganizationSelector";
+
 // Hooks
 export * from "./hooks/useOrganizations";
 
