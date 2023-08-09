@@ -7,12 +7,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: supabase/setup-cli@v1
+      - uses: actions/setup-node@v3
         with:
-          version: 1.50.11
+          node-version-file: '.nvmrc'
+      - name: Install deps
+        run: npm ci
       - name: Supabase Start
         working-directory: ./packages/enterprise-supabase
-        run: supabase start
+        run: npx supabase start
       - name: Run Tests
         working-directory: ./packages/enterprise-supabase
-        run: supabase db test
+        run: npx supabase db test
