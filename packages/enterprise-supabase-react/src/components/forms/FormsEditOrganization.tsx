@@ -78,10 +78,13 @@ export const FromEditOrganization = (
 
   return (
     <Form {...form}>
-      <form onSubmit={() => {
-        const handle = () => form.handleSubmit(onSubmit);
-        handle();
-      }} className="space-y-8">
+      <form
+        onSubmit={() => {
+          const handle = () => form.handleSubmit(onSubmit);
+          handle();
+        }}
+        className="space-y-8"
+      >
         <FormField
           control={form.control}
           name="name"

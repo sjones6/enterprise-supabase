@@ -19,7 +19,8 @@ export const OrganizationProvider = ({
   const { data } = useOrganizations({
     enabled: !!auth.session,
   });
-  const primaryOrganization = auth.session && auth.session.user.app_metadata.organization as string;
+  const primaryOrganization =
+    auth.session && (auth.session.user.app_metadata.organization as string);
   return (
     <OrganizationContext.Provider
       value={{
