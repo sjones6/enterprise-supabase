@@ -5,5 +5,10 @@ module.exports = {
   ],
   parserOptions: {
     project: ["./tsconfig.json", "./tsconfig.node.json"],
+  },
+  settings: {
+    react: {
+        version: "detect"
+    }
   }
 };
