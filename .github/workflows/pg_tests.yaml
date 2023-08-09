@@ -1,0 +1,18 @@
+name: PGTap Tests
+on:
+  pull_request:
+    branches: [ main ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 1.50.11
+      - name: Supabase Start
+        working-directory: ./packages/enterprise-supabase
+        run: supabase start
+      - name: Run Tests
+        working-directory: ./packages/enterprise-supabase
+        run: supabase db test
