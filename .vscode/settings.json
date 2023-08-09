@@ -1,0 +1,10 @@
+{
+    "eslint.workingDirectories": [
+      "./apps/example-vite-react",
+      "packages/enterprise-supabase",
+      "packages/enterprise-supabase-react",
+      "packages/eslint-config-costom",
+      "packages/eslint-config-costom-react",
+    ]
+  }
+  

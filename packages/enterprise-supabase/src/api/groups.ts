@@ -37,7 +37,7 @@ export class GroupsClient implements IGroupsClient {
         .from("groups")
         .select()
         .eq("id", organizationId)
-        .maybeSingle()
+        .single()
         .throwOnError()
     );
   }

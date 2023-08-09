@@ -92,11 +92,9 @@ export const Theme = ({
       };
 
       const root = document.querySelector(":root") as HTMLElement;
-      if (root) {
-        Object.entries(lightTheme).map(([key, value]) => {
-          root.style.setProperty(`--${key}`, value);
-        });
-      }
+      Object.entries(lightTheme).map(([key, value]) => {
+        root.style.setProperty(`--${key}`, value);
+      });
 
       const darkTheme: ThemeProps = {
         ...defaultDarkTheme,
@@ -107,11 +105,14 @@ export const Theme = ({
       if (darks.length > 0) {
         Array.prototype.forEach.call(darks, (dark) => {
           Object.entries(darkTheme).map(([key, value]) => {
+            /* eslint-disable @typescript-eslint/no-unsafe-member-access */
+            /* eslint-disable @typescript-eslint/no-unsafe-call */
             dark.style.setProperty(`--${key}`, value);
           });
         });
       }
     }
+  /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [isClient]);
   return <></>;
 };

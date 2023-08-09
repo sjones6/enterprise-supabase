@@ -24,7 +24,8 @@
     "dev:ts": "npm run build:ts -- --watch",
     "build": "concurrently \"npm:build:*\"",
     "build:css": "npx tailwindcss -i ./src/index.css -o ./dist/index.css",
-    "build:ts": "tsup src/index.ts --format cjs,esm --dts"
+    "build:ts": "tsup src/index.ts --format cjs,esm --dts",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "peerDependencies": {
     "react": ">18.2.0",

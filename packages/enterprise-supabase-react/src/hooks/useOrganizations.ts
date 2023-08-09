@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-floating-promises */
+
 import { CreateOrUpdateOrganization, Organization } from "enterprise-supabase";
 import {
   useMutation,

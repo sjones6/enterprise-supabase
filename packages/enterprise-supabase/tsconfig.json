@@ -8,6 +8,8 @@
     "declaration": true,
     "sourceMap": true,
     "outDir": "./dist",
+    "strict": true,
+    "strictNullChecks": true,
     "removeComments": true,
     "noImplicitAny": false,
     "noImplicitThis": true,

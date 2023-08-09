@@ -60,7 +60,7 @@ export const FromEditOrganization = (
     if (organization) {
       form.setValue("name", organization.name);
     }
-  }, [organization]);
+  }, [organization, form]);
 
   async function onSubmit(update: FormSchema) {
     try {
@@ -72,24 +72,27 @@ export const FromEditOrganization = (
       props.onSuccess && props.onSuccess(res);
     } catch (err) {
       console.log(err);
-      props.onError && props.onError(err as unknown as PostgrestError);
+      props.onError && props.onError(err as PostgrestError);
     }
   }
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      <form onSubmit={() => {
+        const handle = () => form.handleSubmit(onSubmit);
+        handle();
+      }} className="space-y-8">
         <FormField
           control={form.control}
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{props?.fields?.name?.label || "Name"}</FormLabel>
+              <FormLabel>{props.fields?.name?.label || "Name"}</FormLabel>
               <FormControl>
                 <Input {...field} disabled={isLoading} />
               </FormControl>
               <FormDescription>
-                {props?.fields?.name?.description ||
+                {props.fields?.name?.description ||
                   "Required. The name of your organization."}
               </FormDescription>
               <FormMessage />

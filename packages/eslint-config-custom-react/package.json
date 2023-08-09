@@ -1,0 +1,15 @@
+{
+  "name": "eslint-config-custom-react",
+  "version": "0.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "eslint-config-custom": "*",
+    "eslint-plugin-react": "7.28.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

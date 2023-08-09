@@ -28,12 +28,15 @@ export function OrganizationSelector() {
 
   return (
     <Select
-      onValueChange={async (value) => {
-        try {
-          await mutateAsync(value);
-        } catch (err) {
-          console.error(err);
-        }
+      onValueChange={(value) => {
+        const handle = async (value: string) => {
+          try {
+            await mutateAsync(value);
+          } catch (err) {
+            console.error(err);
+          }
+        };
+        void handle(value);
       }}
       defaultValue={primaryOrganization?.id}
     >
