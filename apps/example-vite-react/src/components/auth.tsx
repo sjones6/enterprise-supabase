@@ -18,9 +18,7 @@ const AuthContext = createContext<{
   loading: true,
 });
 
-export const AuthProvider = ({
-  children,
-}: PropsWithChildren) => {
+export const AuthProvider = ({ children }: PropsWithChildren) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const value = useMemo(() => ({ session, loading }), [session, loading]);

@@ -10,9 +10,7 @@ function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(" ");
 }
 
-export default function Layout({
-  children,
-}: PropsWithChildren): JSX.Element {
+export default function Layout({ children }: PropsWithChildren): JSX.Element {
   const location = useLocation();
   const session = useAuth();
 

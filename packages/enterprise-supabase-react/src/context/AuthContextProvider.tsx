@@ -18,9 +18,7 @@ const AuthContext = createContext<{
   loading: true,
 });
 
-export const AuthContextProvider = ({
-  children,
-}: PropsWithChildren) => {
+export const AuthContextProvider = ({ children }: PropsWithChildren) => {
   const supabase = useSupabaseClient();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
