@@ -13,7 +13,13 @@ export default function Profile(): JSX.Element {
       <h1 className="text-lg font-bold mb-3">Profile</h1>
       <div>Logged in as {session.session.user.email}.</div>
       <Separator className="my-3" />
-      <Button variant={"outline"} onClick={() => supabase.auth.signOut()}>
+      <Button
+        variant={"outline"}
+        onClick={() => {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          supabase.auth.signOut();
+        }}
+      >
         Sign out
       </Button>
     </>

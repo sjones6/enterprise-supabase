@@ -1,4 +1,4 @@
-import { createContext, useContext, PropsWithChildren, useMemo } from "react";
+import { createContext, useContext, PropsWithChildren } from "react";
 import type { Organization } from "enterprise-supabase";
 import { useAuth } from "./AuthContextProvider";
 import { useOrganizations } from "../hooks/useOrganizations";
@@ -14,13 +14,13 @@ const OrganizationContext = createContext<OrganizationContextValue | null>(
 
 export const OrganizationProvider = ({
   children,
-}: PropsWithChildren<{}>): JSX.Element => {
+}: PropsWithChildren): JSX.Element => {
   const auth = useAuth();
   const { data } = useOrganizations({
     enabled: !!auth.session,
   });
   const primaryOrganization =
-    auth && auth.session && auth.session.user.app_metadata.organization;
+    auth.session && (auth.session.user.app_metadata.organization as string);
   return (
     <OrganizationContext.Provider
       value={{
@@ -47,7 +47,6 @@ export const useOrganizationContext = (): {
   const { primaryOrganization, organizations } = ctx;
   const organization =
     primaryOrganization &&
-    organizations &&
     organizations.find((org) => org.id === primaryOrganization);
   return {
     primaryOrganization: organization || null,

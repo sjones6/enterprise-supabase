@@ -49,7 +49,7 @@ export class RolesClient implements IRolesClient {
         .from("roles")
         .select()
         .eq("id", groupId)
-        .maybeSingle()
+        .single()
         .throwOnError()
     );
   }

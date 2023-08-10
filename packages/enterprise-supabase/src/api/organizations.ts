@@ -40,7 +40,7 @@ export class OrganizationsClient implements IOrganizationsClient {
         .from("organizations")
         .select()
         .eq("id", organizationId)
-        .maybeSingle()
+        .single()
         .throwOnError()
     );
   }
@@ -69,7 +69,7 @@ export class OrganizationsClient implements IOrganizationsClient {
         .update(organization)
         .eq("id", organizationId)
         .select()
-        .maybeSingle()
+        .single()
         .throwOnError()
     );
   }

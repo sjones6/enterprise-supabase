@@ -2,15 +2,7 @@ import type { PropsWithChildren } from "react";
 import { HomeIcon, UserCircleIcon } from "@heroicons/react/24/outline";
 import { useAuth } from "@/components/auth";
 import { Link, useLocation } from "react-router-dom";
-import {
-  DialogCreateOrganization,
-  DialogEditOrganization,
-  OrganizationSelector,
-  useCreateOrganization,
-  useOrganizations,
-} from "enterprise-supabase-react";
-import * as paths from "@/lib/paths";
-import { Button } from "@/components/ui/button";
+import { OrganizationSelector } from "enterprise-supabase-react";
 
 const navigation = [{ name: "Home", href: "/", icon: HomeIcon, exact: true }];
 
@@ -18,13 +10,9 @@ function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(" ");
 }
 
-export default function Layout({
-  children,
-}: PropsWithChildren<{}>): JSX.Element {
+export default function Layout({ children }: PropsWithChildren): JSX.Element {
   const location = useLocation();
   const session = useAuth();
-
-  const organizations = useOrganizations();
 
   return (
     <div className="flex flex-row h-screen w-screen">

@@ -18,7 +18,7 @@ const AuthContext = createContext<{
   loading: true,
 });
 
-export const AuthContextProvider = ({ children }: PropsWithChildren<{}>) => {
+export const AuthContextProvider = ({ children }: PropsWithChildren) => {
   const supabase = useSupabaseClient();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,7 +28,7 @@ export const AuthContextProvider = ({ children }: PropsWithChildren<{}>) => {
     const run = async () => {
       // get session data if there is an active session
       const session = await supabase.auth.getSession();
-      setSession(session?.data.session ?? null);
+      setSession(session.data.session ?? null);
       setLoading(false);
     };
 
@@ -40,13 +40,14 @@ export const AuthContextProvider = ({ children }: PropsWithChildren<{}>) => {
       }
     );
 
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     run();
 
     // cleanup the useEffect hook
     return () => {
       listener.subscription.unsubscribe();
     };
-  }, []);
+  }, [supabase.auth]);
 
   return (
     <AuthContext.Provider value={value}>

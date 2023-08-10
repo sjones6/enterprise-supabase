@@ -22,9 +22,10 @@
     "dev": "npm run build -- --watch",
     "build": "tsup src/index.ts --format cjs,esm --dts",
     "db:reset": "supabase db reset && npm run supabase:types",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0 --resolve-plugins-relative-to .",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
-    "supabase:types": "supabase gen types typescript --local --schema authz > src/database.ts && cp src/database.ts ../../apps/example-vite-react/src/lib/database.ts"
+    "supabase:types": "supabase gen types typescript --local --schema authz,public > src/database.ts && cp src/database.ts ../../apps/example-vite-react/src/lib/database.ts"
   },
   "peerDependencies": {
     "@supabase/supabase-js": "^2.32.0",
@@ -32,7 +33,7 @@
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.32.0",
-    "supabase": "^1.82.6",
+    "supabase": "^1.83.7",
     "typescript": "^5.1.6"
   },
   "dependencies": {

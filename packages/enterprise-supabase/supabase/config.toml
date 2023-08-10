@@ -1,6 +1,5 @@
-# A string used to distinguish different Supabase projects on the same host. Defaults to the
-# working directory name when running `supabase init`.
-project_id = "email-saas"
+# A string used to distinguish different Supabase projects on the same host.
+project_id = "enterprise-supabase"
 
 [api]
 # Port to use for the API URL.
