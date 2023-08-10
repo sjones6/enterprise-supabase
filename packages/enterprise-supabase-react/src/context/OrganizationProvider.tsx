@@ -14,7 +14,7 @@ const OrganizationContext = createContext<OrganizationContextValue | null>(
 
 export const OrganizationProvider = ({
   children,
-}: PropsWithChildren<Record<string, never>>): JSX.Element => {
+}: PropsWithChildren): JSX.Element => {
   const auth = useAuth();
   const { data } = useOrganizations({
     enabled: !!auth.session,

@@ -12,7 +12,7 @@ function classNames(...classes: string[]) {
 
 export default function Layout({
   children,
-}: PropsWithChildren<Record<string, never>>): JSX.Element {
+}: PropsWithChildren): JSX.Element {
   const location = useLocation();
   const session = useAuth();
 

@@ -20,7 +20,7 @@ const AuthContext = createContext<{
 
 export const AuthContextProvider = ({
   children,
-}: PropsWithChildren<Record<string, never>>) => {
+}: PropsWithChildren) => {
   const supabase = useSupabaseClient();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);

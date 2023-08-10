@@ -20,7 +20,7 @@ const AuthContext = createContext<{
 
 export const AuthProvider = ({
   children,
-}: PropsWithChildren<Record<string, never>>) => {
+}: PropsWithChildren) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const value = useMemo(() => ({ session, loading }), [session, loading]);

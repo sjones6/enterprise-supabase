@@ -5,6 +5,6 @@ const queryClient = new QueryClient();
 
 export const QueryProvider = ({
   children,
-}: PropsWithChildren<Record<string, never>>): JSX.Element => (
+}: PropsWithChildren): JSX.Element => (
   <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 );
