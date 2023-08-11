@@ -1,24 +1,30 @@
 import type { EnterpriseSupabaseClient, Group } from "../types";
-import { unwrapPostgrestSingleReponse } from "./utils";
+import { PaginatedResponse, Pagination } from "./types";
+import {
+  calculatePagination,
+  paginateResponse,
+  unwrapPostgrestSingleReponse,
+} from "./utils";
 
-export type CreateOrUpdateGroup = {
-  name: string;
-  description?: string;
-  organization_id: string;
-};
+export type CreateGroup = Pick<
+  Group,
+  "name" | "description" | "organization_id"
+>;
+
+export type UpdateGroup = Pick<Group, "name" | "description">;
 
 export interface IGroupsClient {
-  create(group: CreateOrUpdateGroup): Promise<Group>;
+  create(group: CreateGroup): Promise<Group>;
   getById(groupId: string): Promise<Group>;
-  list(): Promise<Group[]>;
-  updateById(groupId: string, group: CreateOrUpdateGroup): Promise<Group>;
+  list(pagination?: Pagination<Group>): Promise<PaginatedResponse<Group>>;
+  updateById(groupId: string, group: UpdateGroup): Promise<Group>;
   deleteById(groupId: string): Promise<unknown>;
 }
 
 export class GroupsClient implements IGroupsClient {
   constructor(private supabase: EnterpriseSupabaseClient) {}
 
-  async create(group: CreateOrUpdateGroup): Promise<Group> {
+  async create(group: CreateGroup): Promise<Group> {
     return unwrapPostgrestSingleReponse(
       await this.supabase
         .schema("authz")
@@ -42,16 +48,22 @@ export class GroupsClient implements IGroupsClient {
     );
   }
 
-  async list(): Promise<Group[]> {
-    return unwrapPostgrestSingleReponse(
-      await this.supabase.schema("authz").from("groups").select().throwOnError()
-    );
+  async list(pagination: Pagination<Group>): Promise<PaginatedResponse<Group>> {
+    const { from, to } = calculatePagination(pagination);
+    let query = this.supabase
+      .schema("authz")
+      .from("groups")
+      .select()
+      .range(from, to);
+    if (pagination.orderBy) {
+      query = query.order(pagination.orderBy, {
+        ascending: pagination.direction ? pagination.direction === "asc" : true,
+      });
+    }
+    return paginateResponse<Group>(await query.throwOnError(), pagination);
   }
 
-  async updateById(
-    groupId: string,
-    group: CreateOrUpdateGroup
-  ): Promise<Group> {
+  async updateById(groupId: string, group: UpdateGroup): Promise<Group> {
     return unwrapPostgrestSingleReponse(
       await this.supabase
         .schema("authz")

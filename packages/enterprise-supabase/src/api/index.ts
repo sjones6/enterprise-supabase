@@ -3,6 +3,8 @@ import { GroupsClient, IGroupsClient } from "./groups";
 import { IOrganizationsClient, OrganizationsClient } from "./organizations";
 import { IRolesClient, RolesClient } from "./roles";
 
+export { PaginatedResponse, Pagination } from "./types";
+
 export { OrganizationsClient } from "./organizations";
 export type {
   CreateOrUpdateOrganization,
@@ -13,7 +15,7 @@ export { RolesClient } from "./roles";
 export type { CreateOrUpdateRole, IRolesClient } from "./roles";
 
 export { GroupsClient } from "./groups";
-export type { CreateOrUpdateGroup, IGroupsClient } from "./groups";
+export type { CreateGroup, UpdateGroup, IGroupsClient } from "./groups";
 
 export type EnterpriseSupabaseAPIClient = {
   organizations: IOrganizationsClient;
