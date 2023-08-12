@@ -53,7 +53,7 @@ export class GroupsClient implements IGroupsClient {
     let query = this.supabase
       .schema("authz")
       .from("groups")
-      .select()
+      .select("*", { count: "exact" })
       .range(from, to);
     if (pagination.orderBy) {
       query = query.order(pagination.orderBy, {

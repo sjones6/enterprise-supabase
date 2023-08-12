@@ -76,12 +76,15 @@ export const FromEditOrganization = (
     }
   }
 
+  const handle = form.handleSubmit(onSubmit);
+
   return (
     <Form {...form}>
       <form
-        onSubmit={() => {
-          const handle = () => form.handleSubmit(onSubmit);
-          handle();
+        onSubmit={(e) => {
+          handle(e).catch((err) => {
+            console.error(err);
+          });
         }}
         className="space-y-8"
       >

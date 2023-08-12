@@ -17,14 +17,6 @@ import {
 } from "react-query";
 import { useEnterpriseSupabaseApiClient } from "../context/SupabaseClientProvider";
 import { PostgrestError } from "@supabase/supabase-js";
-import {
-  ColumnDef,
-  PaginationState,
-  createColumnHelper,
-  getCoreRowModel,
-  useReactTable,
-} from "@tanstack/react-table";
-import { useMemo, useState } from "react";
 
 export const useCreateGroup = (
   options: UseMutationOptions<Group, PostgrestError, CreateGroup> = {}
@@ -106,46 +98,6 @@ export const useGroups = (
       keepPreviousData: true,
     }
   );
-};
-
-export const groupTableColumnHelper = createColumnHelper<Group>();
-
-export type UseGroupTableProps = {
-  columns: ColumnDef<Group>[];
-  order?: Pick<Pagination<Group>, "orderBy" | "direction">;
-};
-
-export const useGroupTable = ({ order, columns }: UseGroupTableProps) => {
-  const [{ pageIndex, pageSize }, setPagination] = useState<PaginationState>({
-    pageIndex: 0,
-    pageSize: 20,
-  });
-
-  const pagination = useMemo(
-    () => ({
-      pageIndex,
-      pageSize,
-    }),
-    [pageIndex, pageSize]
-  );
-
-  const { data } = useGroups({
-    page: pageIndex,
-    perPage: pageSize,
-    ...order,
-  });
-
-  return useReactTable({
-    data: data?.items || [],
-    columns,
-    pageCount: data?.totalPages || -1,
-    state: {
-      pagination,
-    },
-    onPaginationChange: setPagination,
-    getCoreRowModel: getCoreRowModel(),
-    manualPagination: true,
-  });
 };
 
 export const useGroupById = (
