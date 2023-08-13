@@ -12,23 +12,29 @@ import {
 } from "../ui/form";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { useCreateOrganization } from "../../hooks/useOrganizations";
-import { Organization } from "enterprise-supabase";
 import { PostgrestError } from "@supabase/supabase-js";
+import { useCreateGroup } from "../../hooks/useGroups";
+import { useOrganizationContext } from "../../context/OrganizationProvider";
+import { Group } from "enterprise-supabase";
 
 const formSchema = z.object({
   name: z.string().min(2, {
     message: "Name must be at least 2 characters.",
   }),
+  description: z.string(),
 });
 
 type FormSchema = z.infer<typeof formSchema>;
 
-export type FormCreateOrganizationProps = {
-  onSuccess?: (organization: Organization) => void;
+export type FormCreateGroupProps = {
+  onSuccess?: (group: Group) => void;
   onError?: (error: PostgrestError) => void;
   fields?: {
     name?: {
+      label?: string;
+      description?: string;
+    };
+    description?: {
       label?: string;
       description?: string;
     };
@@ -36,22 +42,29 @@ export type FormCreateOrganizationProps = {
   saveButtonLabel?: string;
 };
 
-export const FromCreateOrganization = (
-  props: FormCreateOrganizationProps = {}
+export const FormCreateGroup = (
+  props: FormCreateGroupProps = {}
 ): JSX.Element => {
-  const { mutateAsync, error } = useCreateOrganization();
+  const { primaryOrganization } = useOrganizationContext();
+  const { mutateAsync, error } = useCreateGroup();
 
   const form = useForm<FormSchema>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
+      description: "",
     },
   });
 
   async function onSubmit(values: FormSchema) {
     try {
-      const res = await mutateAsync(values);
-      props.onSuccess && props.onSuccess(res);
+      if (primaryOrganization) {
+        const res = await mutateAsync({
+          ...values,
+          organization_id: primaryOrganization.id,
+        });
+        props.onSuccess && props.onSuccess(res);
+      }
     } catch (err) {
       props.onError && props.onError(err as PostgrestError);
     }
@@ -61,6 +74,11 @@ export const FromCreateOrganization = (
 
   return (
     <Form {...form}>
+      {!primaryOrganization && (
+        <div className="text-red-500">
+          Select a primary organization before creating the group.
+        </div>
+      )}
       <form
         onSubmit={(e) => {
           handle(e).catch((err) => {
@@ -82,21 +100,42 @@ export const FromCreateOrganization = (
               </FormControl>
               <FormDescription>
                 {props.fields?.name?.description ||
-                  "Required. The name of your organization."}
+                  "Required. The name of your group."}
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>
+                {props.fields?.description?.label || "Description"}
+              </FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+              <FormDescription>
+                {props.fields?.description?.description ||
+                  "Optional. The description of your group."}
               </FormDescription>
               <FormMessage />
             </FormItem>
           )}
         />
         <Button
-          disabled={form.formState.isSubmitting || !form.formState.isValid}
+          disabled={
+            !primaryOrganization ||
+            form.formState.isSubmitting ||
+            !form.formState.isValid
+          }
           type="submit"
         >
-          {props.saveButtonLabel || "Create organization"}
+          {props.saveButtonLabel || "Create group"}
         </Button>
-        {error && (
-          <div className="text-red-500">Failed to create organization.</div>
-        )}
+        {error && <div className="text-red-500">Failed to create group.</div>}
       </form>
     </Form>
   );

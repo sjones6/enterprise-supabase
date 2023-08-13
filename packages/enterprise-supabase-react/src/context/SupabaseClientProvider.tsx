@@ -7,6 +7,7 @@ import {
 } from "enterprise-supabase";
 import { AuthContextProvider } from "./AuthContextProvider";
 import { OrganizationProvider } from "./OrganizationProvider";
+import { SettingsContextValueProp, SettingsProvider } from "./SettingsProvider";
 
 const defaultQueryClient = new QueryClient();
 
@@ -22,19 +23,23 @@ export const SupabaseClientProvider = ({
   children,
   client,
   queryClient = defaultQueryClient,
+  settings,
 }: PropsWithChildren<{
   client: EnterpriseSupabaseClient;
   queryClient?: QueryClient;
+  settings?: SettingsContextValueProp;
 }>): JSX.Element => {
   const apiClient = useMemo(() => createApi(client), [client]);
   return (
-    <QueryClientProvider client={queryClient}>
-      <SupabaseClientProviderContext.Provider value={{ client, apiClient }}>
-        <AuthContextProvider>
-          <OrganizationProvider>{children}</OrganizationProvider>
-        </AuthContextProvider>
-      </SupabaseClientProviderContext.Provider>
-    </QueryClientProvider>
+    <SettingsProvider {...settings}>
+      <QueryClientProvider client={queryClient}>
+        <SupabaseClientProviderContext.Provider value={{ client, apiClient }}>
+          <AuthContextProvider>
+            <OrganizationProvider>{children}</OrganizationProvider>
+          </AuthContextProvider>
+        </SupabaseClientProviderContext.Provider>
+      </QueryClientProvider>
+    </SettingsProvider>
   );
 };
 
