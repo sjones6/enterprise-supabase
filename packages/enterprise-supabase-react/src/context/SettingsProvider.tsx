@@ -1,18 +1,22 @@
 import { PropsWithChildren, createContext, useContext } from "react";
 
 type SettingsContextValue = {
+  sync: {
+    permissions: number | false;
+  };
   format: {
-    /**
-     * A date-time string format for `date-fns`.
-     *
-     * See https://date-fns.org
-     */
     dateTime: string;
   };
   onError: (err: unknown) => unknown;
 };
 
 export type SettingsContextValueProp = Partial<{
+  sync: {
+    /**
+     * How frequently to refresh permissions. Defaults to every 5 mins.
+     */
+    permissions: number | false;
+  };
   format: Partial<{
     /**
      * A date-time string format for `date-fns`.
@@ -25,6 +29,9 @@ export type SettingsContextValueProp = Partial<{
 }>;
 
 const defaultSettings: SettingsContextValue = {
+  sync: {
+    permissions: 5 * 60 * 1000,
+  },
   format: {
     dateTime: "Pp",
   },

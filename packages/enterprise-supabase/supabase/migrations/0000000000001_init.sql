@@ -23,9 +23,9 @@ CREATE OR REPLACE FUNCTION authz.add_timestamps()
     VOLATILE NOT LEAKPROOF
 AS $BODY$
     BEGIN
-        NEW.updated_at = now();
+        NEW.updated_at = now() at time zone 'utc';
         IF (TG_OP = 'INSERT') THEN
-            NEW.created_at = now();
+            NEW.created_at = now() at time zone 'utc';
         END IF;
         RETURN NEW;
     END;
@@ -45,8 +45,8 @@ CREATE TABLE IF NOT EXISTS authz.organizations
 (
     id uuid PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
     name text NOT NULL COLLATE pg_catalog."default",
-    updated_at timestamp without time zone,
-    created_at timestamp without time zone
+    updated_at timestamp with time zone,
+    created_at timestamp with time zone
 )
 TABLESPACE pg_default;
 
@@ -66,8 +66,8 @@ CREATE TABLE IF NOT EXISTS authz.members
     user_id uuid NOT NULL REFERENCES auth.users (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    updated_at timestamp without time zone,
-    created_at timestamp without time zone,
+    updated_at timestamp with time zone,
+    created_at timestamp with time zone,
     CONSTRAINT members_organizations_id_user_id_key UNIQUE (organization_id, user_id)     
 )
 TABLESPACE pg_default;
@@ -89,8 +89,8 @@ CREATE TABLE IF NOT EXISTS authz.roles
     organization_id uuid REFERENCES authz.organizations (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    updated_at timestamp without time zone,
-    created_at timestamp without time zone
+    updated_at timestamp with time zone,
+    created_at timestamp with time zone
 )
 TABLESPACE pg_default;
 
@@ -107,8 +107,8 @@ CREATE TABLE IF NOT EXISTS authz.permissions
     name text NOT NULL COLLATE pg_catalog."default",
     slug text NOT NULL UNIQUE COLLATE pg_catalog."default",
     description text NOT NULL COLLATE pg_catalog."default" DEFAULT '',
-    updated_at timestamp without time zone,
-    created_at timestamp without time zone
+    updated_at timestamp with time zone,
+    created_at timestamp with time zone
 )
 TABLESPACE pg_default;
 
@@ -128,8 +128,8 @@ CREATE TABLE IF NOT EXISTS authz.role_permissions
     permission_id uuid NOT NULL REFERENCES authz.permissions (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    updated_at timestamp without time zone,
-    created_at timestamp without time zone
+    updated_at timestamp with time zone,
+    created_at timestamp with time zone
 )
 TABLESPACE pg_default;
 
@@ -149,8 +149,8 @@ CREATE TABLE IF NOT EXISTS authz.member_roles
     member_id uuid NOT NULL REFERENCES authz.members (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    updated_at timestamp without time zone,
-    created_at timestamp without time zone
+    updated_at timestamp with time zone,
+    created_at timestamp with time zone
 )
 TABLESPACE pg_default;
 
@@ -170,8 +170,8 @@ CREATE TABLE IF NOT EXISTS authz.groups
     organization_id uuid NOT NULL REFERENCES authz.organizations (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    updated_at timestamp without time zone,
-    created_at timestamp without time zone  
+    updated_at timestamp with time zone,
+    created_at timestamp with time zone  
 )
 TABLESPACE pg_default;
 
@@ -193,8 +193,8 @@ CREATE TABLE IF NOT EXISTS authz.group_roles
     group_id uuid NOT NULL REFERENCES authz.groups (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    updated_at timestamp without time zone,
-    created_at timestamp without time zone,
+    updated_at timestamp with time zone,
+    created_at timestamp with time zone,
     CONSTRAINT group_roles_group__id_role_id_key UNIQUE (group_id, role_id)   
 )
 TABLESPACE pg_default;
@@ -215,8 +215,8 @@ CREATE TABLE IF NOT EXISTS authz.group_members
     member_id uuid NOT NULL REFERENCES authz.members (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    updated_at timestamp without time zone,
-    created_at timestamp without time zone,
+    updated_at timestamp with time zone,
+    created_at timestamp with time zone,
     CONSTRAINT group_members_group_id_member_id_key UNIQUE (group_id, member_id)     
 )
 TABLESPACE pg_default;
@@ -239,10 +239,19 @@ CREATE TRIGGER group_members_timestamps
 -- 
 -- Get all permissions in an organization
 -- 
+CREATE TYPE authz.permissions_row AS (
+    id uuid,
+    name text,
+    description text,
+    slug text,
+    updated_at timestamp with time zone,
+    created_at timestamp with time zone
+);
+
 CREATE OR REPLACE FUNCTION authz.get_permissions_in_organization(
     organization_id uuid
 	)
-    RETURNS SETOF text
+    RETURNS SETOF authz.permissions_row
     LANGUAGE 'sql'
     COST 100
     STABLE SECURITY DEFINER 
@@ -250,7 +259,7 @@ CREATE OR REPLACE FUNCTION authz.get_permissions_in_organization(
     ROWS 1000
     SET search_path=authz
 AS $BODY$
-    SELECT p.slug
+    SELECT (p.id, p.name, p.description, p.slug, p.updated_at, p.created_at)
       FROM permissions p
       LEFT JOIN role_permissions rp ON rp.permission_id = p.id
       WHERE rp.role_id IN (
@@ -275,6 +284,29 @@ REVOKE ALL ON FUNCTION authz.get_permissions_in_organization(organization_id uui
 GRANT EXECUTE ON FUNCTION authz.get_permissions_in_organization(organization_id uuid) TO authenticated;
 
 -- 
+-- Get all permission slugs in an organization
+-- 
+CREATE OR REPLACE FUNCTION authz.get_permission_slugs_in_organization(
+    organization_id uuid
+	)
+    RETURNS SETOF text
+    LANGUAGE 'sql'
+    COST 100
+    STABLE SECURITY DEFINER 
+    PARALLEL UNSAFE
+    ROWS 1000
+    SET search_path=authz
+AS $BODY$
+    SELECT slug FROM authz.get_permissions_in_organization(organization_id);
+$BODY$;
+
+ALTER FUNCTION authz.get_permission_slugs_in_organization(organization_id uuid)
+    OWNER TO CURRENT_ROLE;
+
+REVOKE ALL ON FUNCTION authz.get_permission_slugs_in_organization(organization_id uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.get_permission_slugs_in_organization(organization_id uuid) TO authenticated;
+
+-- 
 -- Check if authenticated user has permission in an organization.
 -- 
 CREATE OR REPLACE FUNCTION authz.has_permission_in_organization(
@@ -288,7 +320,7 @@ CREATE OR REPLACE FUNCTION authz.has_permission_in_organization(
     SET search_path=authz
 AS $BODY$
     SELECT $2 IN (
-        SELECT authz.get_permissions_in_organization($1)
+        SELECT authz.get_permission_slugs_in_organization($1)
     );
 $BODY$;
 
@@ -315,7 +347,7 @@ AS $BODY$
         has_permission boolean;
     BEGIN
         has_permission = $2 && (
-            SELECT authz.get_permissions_in_organization($1)
+            SELECT authz.get_permission_slugs_in_organization($1)
         );
         return has_permission;
     END;
@@ -344,7 +376,7 @@ AS $BODY$
         has_permission boolean;
     BEGIN
         has_permission = $2 <@ (
-            SELECT authz.get_permissions_in_organization($1)
+            SELECT authz.get_permission_slugs_in_organization($1)
         );
         return has_permission;
     END;

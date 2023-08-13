@@ -8,6 +8,7 @@ import {
 import { AuthContextProvider } from "./AuthContextProvider";
 import { OrganizationProvider } from "./OrganizationProvider";
 import { SettingsContextValueProp, SettingsProvider } from "./SettingsProvider";
+import { PermissionsProvider } from "./PermissionsContext";
 
 const defaultQueryClient = new QueryClient();
 
@@ -35,7 +36,9 @@ export const SupabaseClientProvider = ({
       <QueryClientProvider client={queryClient}>
         <SupabaseClientProviderContext.Provider value={{ client, apiClient }}>
           <AuthContextProvider>
-            <OrganizationProvider>{children}</OrganizationProvider>
+            <OrganizationProvider>
+              <PermissionsProvider>{children}</PermissionsProvider>
+            </OrganizationProvider>
           </AuthContextProvider>
         </SupabaseClientProviderContext.Provider>
       </QueryClientProvider>
