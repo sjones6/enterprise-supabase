@@ -8,6 +8,7 @@ export * from "./components/Theme";
 // Hooks
 export * from "./hooks/useOrganizations";
 export * from "./hooks/useGroups";
+export * from "./hooks/usePermissions";
 
 // Forms
 export * from "./components/forms/FormsEditOrganization";

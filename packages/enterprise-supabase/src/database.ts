@@ -329,11 +329,17 @@ export interface Database {
           updated_at: string | null;
         };
       };
-      get_permissions_in_organization: {
+      get_permission_slugs_in_organization: {
         Args: {
           organization_id: string;
         };
         Returns: string[];
+      };
+      get_permissions_in_organization: {
+        Args: {
+          organization_id: string;
+        };
+        Returns: Database["authz"]["CompositeTypes"]["permissions_row"][];
       };
       has_all_permissions_in_organization: {
         Args: {
@@ -389,7 +395,14 @@ export interface Database {
       [_ in never]: never;
     };
     CompositeTypes: {
-      [_ in never]: never;
+      permissions_row: {
+        id: string;
+        name: string;
+        description: string;
+        slug: string;
+        updated_at: string;
+        created_at: string;
+      };
     };
   };
   public: {

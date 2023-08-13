@@ -1,4 +1,8 @@
-import type { EnterpriseSupabaseClient, Organization } from "../types";
+import type {
+  EnterpriseSupabaseClient,
+  Organization,
+  Permission,
+} from "../types";
 import { unwrapPostgrestSingleReponse } from "./utils";
 
 export type CreateOrUpdateOrganization = {
@@ -15,6 +19,9 @@ export interface IOrganizationsClient {
   ): Promise<Organization>;
   deleteById(organizationId: string): Promise<unknown>;
   setActiveOrganization(organizationId: string): Promise<void>;
+  getPermissionsForAuthenticatedUser(
+    organizationId: string
+  ): Promise<Permission[]>;
 }
 
 export class OrganizationsClient implements IOrganizationsClient {
@@ -94,5 +101,17 @@ export class OrganizationsClient implements IOrganizationsClient {
       })
       .throwOnError();
     await this.supabase.auth.refreshSession();
+  }
+
+  async getPermissionsForAuthenticatedUser(
+    organizationId: string
+  ): Promise<Permission[]> {
+    const { data } = await this.supabase
+      .schema("authz")
+      .rpc("get_permissions_in_organization", {
+        organization_id: organizationId,
+      })
+      .throwOnError();
+    return data || [];
   }
 }
