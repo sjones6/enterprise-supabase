@@ -28,12 +28,29 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
+<<<<<<< HEAD
 
 type DataTableRowActionsProps = {
   row: Row<Group>;
 };
 
 function DataTableRowActions({ row }: DataTableRowActionsProps) {
+=======
+import { DialogConfirmDeleteGroup } from "../dialogs/DialogConfirmDeleteGroup";
+import { useSettings } from "../../context/SettingsProvider";
+import { format } from "date-fns";
+
+type DataTableRowActionsProps = {
+  row: Row<Group>;
+  onEditGroup: () => void;
+  onDeleteGroup: () => void;
+};
+
+function DataTableRowActions({
+  onDeleteGroup,
+  onEditGroup,
+}: DataTableRowActionsProps) {
+>>>>>>> 450d9dd (progress)
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -46,6 +63,7 @@ function DataTableRowActions({ row }: DataTableRowActionsProps) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[160px]">
+<<<<<<< HEAD
         <DropdownMenuItem>Edit</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -55,6 +73,11 @@ function DataTableRowActions({ row }: DataTableRowActionsProps) {
         >
           Delete
         </DropdownMenuItem>
+=======
+        <DropdownMenuItem onClick={onEditGroup}>Edit</DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onDeleteGroup}>Delete</DropdownMenuItem>
+>>>>>>> 450d9dd (progress)
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -94,16 +117,35 @@ export const useGroupTable = ({ order, columns }: UseGroupTableProps) => {
     state: {
       pagination,
     },
+<<<<<<< HEAD
     onPaginationChange: (p) => {
       console.log(typeof p === "function" ? p(pagination) : { p });
       setPagination(p);
     },
+=======
+    onPaginationChange: setPagination,
+>>>>>>> 450d9dd (progress)
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
   });
 };
 
+<<<<<<< HEAD
 export const GroupsTable = (): JSX.Element => {
+=======
+export type GroupsTableProps = {
+  onEditGroup: (group: Group) => void;
+  onDeleteGroup?: (group: Group) => void;
+};
+
+export const GroupsTable = ({
+  onDeleteGroup,
+  onEditGroup,
+}: GroupsTableProps): JSX.Element => {
+  const settings = useSettings();
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+>>>>>>> 450d9dd (progress)
   const columns: ColumnDef<Group, string>[] = useMemo(() => {
     const columns: ColumnDef<Group, string>[] = [
       groupTableColumnHelper.accessor("name", {
@@ -115,6 +157,7 @@ export const GroupsTable = (): JSX.Element => {
       }),
       groupTableColumnHelper.accessor("updated_at", {
         header: "Last updated",
+<<<<<<< HEAD
       }),
       {
         id: "actions",
@@ -123,6 +166,24 @@ export const GroupsTable = (): JSX.Element => {
     ];
     return columns;
   }, []);
+=======
+        cell: (group) =>
+          format(new Date(group.getValue()), settings.format.dateTime),
+      }),
+      {
+        id: "actions",
+        cell: ({ row }) => (
+          <DataTableRowActions
+            onDeleteGroup={() => setDeleteId(row.original.id)}
+            onEditGroup={() => onEditGroup(row.original)}
+            row={row}
+          />
+        ),
+      },
+    ];
+    return columns;
+  }, [onEditGroup]);
+>>>>>>> 450d9dd (progress)
 
   const table = useGroupTable({
     columns,
@@ -134,6 +195,19 @@ export const GroupsTable = (): JSX.Element => {
 
   return (
     <div className="rounded-md border">
+<<<<<<< HEAD
+=======
+      {deleteId && (
+        <DialogConfirmDeleteGroup
+          open={true}
+          groupId={deleteId}
+          onSuccess={(group: Group) => {
+            onDeleteGroup && onDeleteGroup(group);
+            setDeleteId(null);
+          }}
+        />
+      )}
+>>>>>>> 450d9dd (progress)
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (

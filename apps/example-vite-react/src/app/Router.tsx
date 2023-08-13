@@ -7,7 +7,8 @@ import Login from "./routes/login";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QueryProvider } from "@/lib/query";
 import Profile from "./routes/profile";
-import { GroupsPage } from "enterprise-supabase-react";
+import { GroupsPage } from "./routes/groups";
+import { GroupPage } from "./routes/group";
 
 const router = createBrowserRouter([
   {

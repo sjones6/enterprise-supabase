@@ -58,6 +58,7 @@
     "@tanstack/react-table": "^8.9.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
+    "date-fns": "^2.30.0",
     "enterprise-supabase": "*",
     "lucide-react": "^0.264.0",
     "react-hook-form": "^7.45.4",
