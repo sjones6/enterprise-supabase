@@ -114,6 +114,7 @@ export const GroupsTable = ({
   const settings = useSettings();
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  const dateTimeFormat = settings.format.dateTime;
   const columns: ColumnDef<Group, string>[] = useMemo(() => {
     const columns: ColumnDef<Group, string>[] = [
       groupTableColumnHelper.accessor("name", {
@@ -125,8 +126,7 @@ export const GroupsTable = ({
       }),
       groupTableColumnHelper.accessor("updated_at", {
         header: "Last updated",
-        cell: (group) =>
-          format(new Date(group.getValue()), settings.format.dateTime),
+        cell: (group) => format(new Date(group.getValue()), dateTimeFormat),
       }),
       {
         id: "actions",
@@ -140,7 +140,7 @@ export const GroupsTable = ({
       },
     ];
     return columns;
-  }, [onEditGroup]);
+  }, [onEditGroup, dateTimeFormat]);
 
   const table = useGroupTable({
     columns,
