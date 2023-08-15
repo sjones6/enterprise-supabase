@@ -557,6 +557,135 @@ REVOKE ALL ON FUNCTION authz.set_active_organization(active_organization_id uuid
 GRANT EXECUTE ON FUNCTION authz.set_active_organization(active_organization_id uuid) TO authenticated;
 
 -- 
+-- Update a group
+-- 
+CREATE OR REPLACE FUNCTION authz.edit_group(
+    group_id uuid,
+    organization_id uuid,
+    name text default NULL,
+    description text default NULL,
+    add_members uuid[] default ARRAY[]::uuid[],
+    remove_members uuid[] default ARRAY[]::uuid[],
+    add_roles uuid[] default ARRAY[]::uuid[],
+    remove_roles uuid[] default ARRAY[]::uuid[]
+)
+  RETURNS boolean
+  LANGUAGE 'plpgsql'
+  SECURITY INVOKER
+  SET search_path=authz
+  AS $BODY$
+  DECLARE
+     group_exists boolean;
+     existing_members uuid[];
+     existing_roles uuid[];
+     role_id uuid;
+     member_id uuid;
+  BEGIN
+
+    -- check for existence
+    SELECT exists(SELECT 1 FROM authz.groups g WHERE g.id = group_id AND g.organization_id = organization_id) INTO group_exists;
+    IF group_exists = false THEN
+        return false;
+    END IF;
+
+    -- update name
+    IF name IS NOT NULL THEN
+      UPDATE authz.groups g SET g.name = name
+        WHERE g.id = group_id;
+    END IF;
+
+    -- update description
+    IF description IS NOT NULL THEN
+        UPDATE authz.groups g SET g.description = description
+            WHERE g.id = group_id;
+    END IF;
+
+    -- remove members
+    IF array_length(remove_members, 1) > 0 THEN
+        DELETE FROM authz.group_members gm
+            WHERE gm.member_id IN (remove_members);
+    END IF;
+
+    -- add members
+    IF array_length(add_members, 1) > 0 THEN
+        SELECT member_id FROM authz.group_members gm
+            INTO existing_members
+            WHERE gm.group_id = group_id AND gm.member_id IN (add_members);
+        FOREACH member_id IN ARRAY add_members
+        LOOP
+            IF ARRAY[member_id] <@ exiting_members THEN
+                INSERT INTO authz.group_members (group_id, member_id) 
+                    VALUES (
+                        group_id,
+                        member_id
+                    );
+            END IF;
+        END LOOP; 
+    END IF;
+
+    -- remove roles
+    IF array_length(remove_roles, 1) > 0 THEN
+        DELETE FROM authz.group_roles gr
+            WHERE gr.role_id IN (remove_roles);
+    END IF;
+
+    -- add members
+    IF array_length(add_roles, 1) > 0 THEN
+        SELECT role_id FROM authz.group_roles gr
+            INTO existing_roles
+            WHERE gr.group_id = group_id AND gm.role_id IN (add_roles);
+        FOREACH role_id IN ARRAY add_roles
+        LOOP
+            IF ARRAY[role_id] <@ exiting_roles THEN
+                INSERT INTO authz.group_roles (group_id, role_id) 
+                    VALUES (
+                        group_id,
+                        role_id
+                    );
+            END IF;
+        END LOOP; 
+    END IF;
+
+    RETURN true;
+  END;
+$BODY$;
+
+ALTER FUNCTION authz.edit_group(
+    group_id uuid,
+    organization_id uuid,
+    name text,
+    description text,
+    add_members uuid[],
+    remove_members uuid[],
+    add_roles uuid[],
+    remove_roles uuid[]
+)
+    OWNER TO CURRENT_ROLE;
+
+REVOKE ALL ON FUNCTION authz.edit_group(
+    group_id uuid,
+    organization_id uuid,
+    name text,
+    description text,
+    add_members uuid[],
+    remove_members uuid[],
+    add_roles uuid[],
+    remove_roles uuid[]
+) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.edit_group(
+    group_id uuid,
+    organization_id uuid,
+    name text,
+    description text,
+    add_members uuid[],
+    remove_members uuid[],
+    add_roles uuid[],
+    remove_roles uuid[]
+) TO authenticated;
+ 
+
+
+-- 
 -- RLS
 -- 
 

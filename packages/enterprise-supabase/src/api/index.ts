@@ -15,7 +15,12 @@ export { RolesClient } from "./roles";
 export type { CreateOrUpdateRole, IRolesClient } from "./roles";
 
 export { GroupsClient } from "./groups";
-export type { CreateGroup, UpdateGroup, IGroupsClient } from "./groups";
+export type {
+  CreateGroup,
+  UpdateGroup,
+  UpdateGroupRolesAndMembersParams,
+  IGroupsClient,
+} from "./groups";
 
 export type EnterpriseSupabaseAPIClient = {
   organizations: IOrganizationsClient;

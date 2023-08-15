@@ -329,6 +329,19 @@ export interface Database {
           updated_at: string | null;
         };
       };
+      edit_group: {
+        Args: {
+          group_id: string;
+          organization_id: string;
+          name?: string;
+          description?: string;
+          add_members?: string[];
+          remove_members?: string[];
+          add_roles?: string[];
+          remove_roles?: string[];
+        };
+        Returns: boolean;
+      };
       get_permission_slugs_in_organization: {
         Args: {
           organization_id: string;
