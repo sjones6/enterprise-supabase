@@ -6,6 +6,7 @@ import {
   PaginatedResponse,
   Pagination,
   UpdateGroup,
+  UpdateGroupRolesAndMembersParams,
 } from "enterprise-supabase";
 import {
   useMutation,
@@ -41,6 +42,27 @@ export const useDeleteGroup = (
   const queryClient = useQueryClient();
   const { groups } = useEnterpriseSupabaseApiClient();
   return useMutation((groupId: string) => groups.deleteById(groupId), {
+    onSuccess(data, ctx, vars) {
+      queryClient.invalidateQueries({
+        queryKey: ["enterprise", "groups"],
+      });
+      options.onSuccess && options.onSuccess(data, ctx, vars);
+    },
+    retry: false,
+    ...options,
+  });
+};
+
+export const useUpdateGroupRolesAndMembers = (
+  options: UseMutationOptions<
+    boolean,
+    PostgrestError,
+    UpdateGroupRolesAndMembersParams
+  > = {}
+) => {
+  const queryClient = useQueryClient();
+  const { groups } = useEnterpriseSupabaseApiClient();
+  return useMutation((params) => groups.updateGroupRolesAndMembers(params), {
     onSuccess(data, ctx, vars) {
       queryClient.invalidateQueries({
         queryKey: ["enterprise", "groups"],
