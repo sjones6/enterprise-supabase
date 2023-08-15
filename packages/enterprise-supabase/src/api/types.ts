@@ -10,3 +10,5 @@ export type PaginatedResponse<T> = {
   totalPages: number;
   items: T[];
 };
+
+export type UUID = string;

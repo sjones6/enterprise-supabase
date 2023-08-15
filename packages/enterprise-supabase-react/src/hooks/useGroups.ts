@@ -18,16 +18,28 @@ import {
 } from "react-query";
 import { useEnterpriseSupabaseApiClient } from "../context/SupabaseClientProvider";
 import { PostgrestError } from "@supabase/supabase-js";
+import { useOrganizationContext } from "../context/OrganizationProvider";
+
+type CreateGroupParam = Omit<CreateGroup, 'organization_id'>;
 
 export const useCreateGroup = (
-  options: UseMutationOptions<Group, PostgrestError, CreateGroup> = {}
+  options: UseMutationOptions<Group, PostgrestError, CreateGroupParam> = {}
 ) => {
   const queryClient = useQueryClient();
   const { groups } = useEnterpriseSupabaseApiClient();
-  return useMutation((create: CreateGroup) => groups.create(create), {
+  const { primaryOrganization } = useOrganizationContext();
+  return useMutation((create: CreateGroupParam) => {
+    if (!primaryOrganization) {
+      throw new Error('missing primary organization');
+    }
+    return groups.create({
+      ...create,
+      organization_id: primaryOrganization.id
+    });
+  }, {
     onSuccess(data, ctx, vars) {
       queryClient.invalidateQueries({
-        queryKey: ["enterprise", "groups"],
+        queryKey: ["enterprise", primaryOrganization?.id, "groups"],
       });
       options.onSuccess && options.onSuccess(data, ctx, vars);
     },
@@ -41,15 +53,21 @@ export const useDeleteGroup = (
 ) => {
   const queryClient = useQueryClient();
   const { groups } = useEnterpriseSupabaseApiClient();
-  return useMutation((groupId: string) => groups.deleteById(groupId), {
+  const { primaryOrganization } = useOrganizationContext();
+  return useMutation((groupId: string) => {
+    if (!primaryOrganization) {
+      throw new Error('primary organization missing');
+    }
+    return groups.deleteById([primaryOrganization.id, groupId])
+  }, {
+    ...options,
     onSuccess(data, ctx, vars) {
       queryClient.invalidateQueries({
-        queryKey: ["enterprise", "groups"],
+        queryKey: ["enterprise", primaryOrganization?.id, "groups"],
       });
       options.onSuccess && options.onSuccess(data, ctx, vars);
     },
     retry: false,
-    ...options,
   });
 };
 
@@ -57,15 +75,24 @@ export const useUpdateGroupRolesAndMembers = (
   options: UseMutationOptions<
     boolean,
     PostgrestError,
-    UpdateGroupRolesAndMembersParams
+    Omit<UpdateGroupRolesAndMembersParams, 'organizationId'>
   > = {}
 ) => {
   const queryClient = useQueryClient();
   const { groups } = useEnterpriseSupabaseApiClient();
-  return useMutation((params) => groups.updateGroupRolesAndMembers(params), {
+  const { primaryOrganization } = useOrganizationContext();
+  return useMutation((params) => {
+    if (!primaryOrganization) {
+      throw new Error('missing primary organization');
+    }
+    return groups.updateGroupRolesAndMembers({
+      ...params,
+      organizationId: primaryOrganization.id
+    })
+  }, {
     onSuccess(data, ctx, vars) {
       queryClient.invalidateQueries({
-        queryKey: ["enterprise", "groups"],
+        queryKey: ["enterprise", primaryOrganization?.id, "groups"],
       });
       options.onSuccess && options.onSuccess(data, ctx, vars);
     },
@@ -83,14 +110,19 @@ export const useUpdateGroup = (
 ) => {
   const queryClient = useQueryClient();
   const { groups } = useEnterpriseSupabaseApiClient();
+  const { primaryOrganization} = useOrganizationContext()
   return useMutation(
-    ({ groupId, update }: UpdateGroupVariable) =>
-      groups.updateById(groupId, update),
+    ({ groupId, update }: UpdateGroupVariable) => {
+      if (!primaryOrganization) {
+        throw new Error('missing primary organization');
+      }
+      return groups.updateById([primaryOrganization.id, groupId], update);
+    },
     {
       ...options,
       onSuccess(data, vars, ctx) {
         queryClient.invalidateQueries({
-          queryKey: ["enterprise", "groups"],
+          queryKey: ["enterprise", primaryOrganization?.id, "groups"],
         });
         options.onSuccess && options.onSuccess(data, vars, ctx);
       },
@@ -106,15 +138,21 @@ export const useGroups = (
       PaginatedResponse<Group>,
       PostgrestError,
       PaginatedResponse<Group>,
-      [string, string, Pagination<Group>]
+      [string, string | undefined, string, Pagination<Group>]
     >,
     "queryKey" | "queryFn"
   > = {}
 ): UseQueryResult<PaginatedResponse<Group>> => {
   const { groups } = useEnterpriseSupabaseApiClient();
+  const { primaryOrganization } = useOrganizationContext();
   return useQuery(
-    ["enterprise", "groups", pagination],
-    () => groups.list(pagination),
+    ["enterprise", primaryOrganization?.id, "groups", pagination],
+    () => {
+      if (!primaryOrganization) {
+        throw new Error('missing primary organization');
+      }
+      return groups.list(primaryOrganization.id, pagination);
+    },
     {
       ...options,
       keepPreviousData: true,
@@ -123,13 +161,19 @@ export const useGroups = (
 };
 
 export const useGroupById = (
-  organization: string,
+  groupId: string,
   options: Omit<UseQueryOptions<Group>, "queryKey"> = {}
 ): UseQueryResult<Group> => {
   const { groups } = useEnterpriseSupabaseApiClient();
+  const { primaryOrganization } = useOrganizationContext();
   return useQuery(
-    ["enterprise", "groups", organization],
-    () => groups.getById(organization),
+    ["enterprise", primaryOrganization?.id, "groups", groupId],
+    () => {
+      if (!primaryOrganization) {
+        throw new Error('missing primary organization');
+      }
+      return groups.getById([primaryOrganization.id, groupId])
+    },
     options
   );
 };

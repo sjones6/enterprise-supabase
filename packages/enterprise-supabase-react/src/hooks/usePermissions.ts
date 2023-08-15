@@ -12,7 +12,7 @@ export const usePermissionsForAuthenticatedUser = (
   const { primaryOrganization } = useOrganizationContext();
   const auth = useAuth();
   return useQuery<Permission[], PostgrestError>(
-    ["enterprise", "permissions"],
+    ["enterprise", primaryOrganization?.id, "permissions"],
     async (): Promise<Permission[]> => {
       if (!primaryOrganization) {
         return [];

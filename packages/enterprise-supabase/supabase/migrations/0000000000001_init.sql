@@ -59,7 +59,6 @@ CREATE TRIGGER organizations_timestamps
 -- Members
 CREATE TABLE IF NOT EXISTS authz.members
 (
-    id uuid PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
     organization_id uuid NOT NULL REFERENCES authz.organizations (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
@@ -68,7 +67,7 @@ CREATE TABLE IF NOT EXISTS authz.members
         ON DELETE CASCADE,
     updated_at timestamp with time zone,
     created_at timestamp with time zone,
-    CONSTRAINT members_organizations_id_user_id_key UNIQUE (organization_id, user_id)     
+    PRIMARY KEY (organization_id, user_id)
 )
 TABLESPACE pg_default;
 
@@ -90,7 +89,8 @@ CREATE TABLE IF NOT EXISTS authz.roles
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
     updated_at timestamp with time zone,
-    created_at timestamp with time zone
+    created_at timestamp with time zone,
+    UNIQUE(organization_id, slug)
 )
 TABLESPACE pg_default;
 
@@ -142,15 +142,21 @@ CREATE TRIGGER role_permissions_timestamps
 -- Member_Roles (join)
 CREATE TABLE IF NOT EXISTS authz.member_roles
 (
-    id uuid PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+    organization_id uuid NOT NULL REFERENCES authz.organizations (id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE,
+    user_id uuid NOT NULL REFERENCES auth.users (id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE,
     role_id uuid NOT NULL REFERENCES authz.roles (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    member_id uuid NOT NULL REFERENCES authz.members (id) MATCH SIMPLE
-        ON UPDATE NO ACTION
-        ON DELETE CASCADE,
     updated_at timestamp with time zone,
-    created_at timestamp with time zone
+    created_at timestamp with time zone,
+    PRIMARY KEY (organization_id, user_id, role_id),
+    FOREIGN KEY (organization_id, user_id) REFERENCES authz.members (organization_id, user_id)
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE
 )
 TABLESPACE pg_default;
 
@@ -164,14 +170,15 @@ CREATE TRIGGER member_roles_timestamps
 -- Groups
 CREATE TABLE IF NOT EXISTS authz.groups
 (
-    id uuid PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
     name text NOT NULL COLLATE pg_catalog."default",
     description text NOT NULL COLLATE pg_catalog."default" DEFAULT '',
     organization_id uuid NOT NULL REFERENCES authz.organizations (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
     updated_at timestamp with time zone,
-    created_at timestamp with time zone  
+    created_at timestamp with time zone,
+    PRIMARY KEY (organization_id, id)
 )
 TABLESPACE pg_default;
 
@@ -186,16 +193,19 @@ CREATE TRIGGER groups_timestamps
 -- Group Roles
 CREATE TABLE IF NOT EXISTS authz.group_roles
 (
-    id uuid PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
+    organization_id uuid NOT NULL REFERENCES authz.organizations (id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE,
     role_id uuid NOT NULL REFERENCES authz.roles (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    group_id uuid NOT NULL REFERENCES authz.groups (id) MATCH SIMPLE
-        ON UPDATE NO ACTION
-        ON DELETE CASCADE,
+    group_id uuid NOT NULL,
     updated_at timestamp with time zone,
     created_at timestamp with time zone,
-    CONSTRAINT group_roles_group__id_role_id_key UNIQUE (group_id, role_id)   
+    FOREIGN KEY (organization_id, group_id) REFERENCES authz.groups (organization_id, id)
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE,
+    PRIMARY KEY (organization_id, group_id, role_id)   
 )
 TABLESPACE pg_default;
 
@@ -208,16 +218,22 @@ CREATE TRIGGER group_roles_timestamps
 -- Group Members
 CREATE TABLE IF NOT EXISTS authz.group_members
 (
-    id uuid PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
-    group_id uuid NOT NULL REFERENCES authz.groups (id) MATCH SIMPLE
+    organization_id uuid NOT NULL REFERENCES authz.organizations (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    member_id uuid NOT NULL REFERENCES authz.members (id) MATCH SIMPLE
+    group_id uuid NOT NULL,
+    user_id uuid NOT NULL REFERENCES auth.users (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
     updated_at timestamp with time zone,
     created_at timestamp with time zone,
-    CONSTRAINT group_members_group_id_member_id_key UNIQUE (group_id, member_id)     
+    PRIMARY KEY (organization_id, group_id, user_id),
+    FOREIGN KEY (organization_id, user_id) REFERENCES authz.members (organization_id, user_id)
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE,
+    FOREIGN KEY (organization_id, group_id) REFERENCES authz.groups (organization_id, id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE
 )
 TABLESPACE pg_default;
 
@@ -258,23 +274,25 @@ CREATE OR REPLACE FUNCTION authz.get_permissions_in_organization(
     PARALLEL UNSAFE
     ROWS 1000
     SET search_path=authz
-AS $BODY$
-    SELECT (p.id, p.name, p.description, p.slug, p.updated_at, p.created_at)
-      FROM permissions p
-      LEFT JOIN role_permissions rp ON rp.permission_id = p.id
-      WHERE rp.role_id IN (
-        SELECT r.id FROM roles r
-            LEFT JOIN member_roles mr ON mr.role_id = r.id
-            LEFT JOIN members m ON mr.member_id = m.id
-            WHERE m.user_id = auth.uid() AND m.organization_id = $1
-        UNION
-        SELECT r.id FROM roles r
-            LEFT JOIN group_roles gr ON r.id = gr.role_id
-            LEFT JOIN groups g on g.id = gr.group_id
-            LEFT JOIN group_members gm ON gm.group_id = g.id
-            LEFT JOIN members m ON m.id = gm.member_id
-            WHERE m.user_id = auth.uid() AND g.organization_id = $1
-      )
+    AS $BODY$
+        SELECT (
+            p.id, p.name, p.description, p.slug, p.updated_at, p.created_at
+        )
+            FROM permissions p
+            LEFT JOIN role_permissions rp ON rp.permission_id = p.id
+        WHERE rp.role_id IN (
+            SELECT r.id FROM roles r
+                LEFT JOIN member_roles mr ON mr.role_id = r.id
+                LEFT JOIN members m ON mr.organization_id = m.organization_id AND mr.user_id = m.user_id
+                WHERE m.organization_id = $1 AND m.user_id = auth.uid()
+            UNION
+            SELECT r.id FROM roles r
+                LEFT JOIN group_roles gr ON r.id = gr.role_id
+                LEFT JOIN groups g on gr.organization_id = g.organization_id AND g.id = gr.group_id
+                LEFT JOIN group_members gm ON gm.organization_id = g.organization_id AND gm.group_id = g.id
+                LEFT JOIN members m ON  m.organization_id = gm.organization_id AND m.user_id = gm.user_id
+                    WHERE g.organization_id = $1 AND m.user_id = auth.uid() 
+        );
 $BODY$;
 
 ALTER FUNCTION authz.get_permissions_in_organization(organization_id uuid)
@@ -312,11 +330,13 @@ GRANT EXECUTE ON FUNCTION authz.get_permission_slugs_in_organization(organizatio
 CREATE OR REPLACE FUNCTION authz.has_permission_in_organization(
     organization_id uuid,
     permission text
-	)
+)
     RETURNS boolean
     LANGUAGE 'sql'
     COST 100
-    STABLE SECURITY DEFINER PARALLEL UNSAFE
+    STABLE
+    SECURITY DEFINER
+    PARALLEL UNSAFE
     SET search_path=authz
 AS $BODY$
     SELECT $2 IN (
@@ -391,36 +411,40 @@ GRANT EXECUTE ON FUNCTION authz.has_all_permissions_in_organization(organization
 -- 
 -- Check if user has group membership
 -- 
-CREATE OR REPLACE FUNCTION authz.has_group_membership(group_id uuid)
+CREATE OR REPLACE FUNCTION authz.has_group_membership(organization_id uuid, group_id uuid)
     RETURNS boolean
     LANGUAGE 'sql'
-    STABLE SECURITY DEFINER PARALLEL UNSAFE
+    STABLE
+    SECURITY DEFINER
+    PARALLEL UNSAFE
     SET search_path=authz
 AS $BODY$
     SElECT EXISTS(
         SELECT 1 FROM group_members gm
-            LEFT JOIN authz.members m ON m.id = gm.member_id
-            WHERE gm.id = group_id AND m.user_id = auth.uid()
+            LEFT JOIN authz.members m ON gm.organization_id = m.organization_id AND gm.user_id = m.user_id
+            WHERE gm.organization_id = $1 AND gm.group_id = $2 AND m.user_id = auth.uid()
     )
 $BODY$;
 
-ALTER FUNCTION authz.has_group_membership(group_id uuid)
+ALTER FUNCTION authz.has_group_membership(organization_id uuid, group_id uuid)
     OWNER TO CURRENT_ROLE;
 
-REVOKE ALL ON FUNCTION authz.has_group_membership(group_id uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION authz.has_group_membership(group_id uuid) TO authenticated;
+REVOKE ALL ON FUNCTION authz.has_group_membership(organization_id uuid, group_id uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.has_group_membership(organization_id uuid, group_id uuid) TO authenticated;
 
 -- 
 -- Check if the role is available to the designated organization
 -- 
 CREATE OR REPLACE FUNCTION authz.role_available_in_organization(
-    role_id uuid,
-    organization_id uuid
+    organization_id uuid,
+    role_id uuid
 	)
     RETURNS boolean
     LANGUAGE 'plpgsql'
     COST 100
-    STABLE SECURITY DEFINER PARALLEL UNSAFE
+    STABLE
+    SECURITY DEFINER
+    PARALLEL UNSAFE
     SET search_path=authz
 AS $BODY$
     DECLARE
@@ -433,11 +457,11 @@ AS $BODY$
     END;
 $BODY$;
 
-ALTER FUNCTION authz.role_available_in_organization(role_id uuid, organization_id uuid)
+ALTER FUNCTION authz.role_available_in_organization(organization_id uuid, role_id uuid)
     OWNER TO CURRENT_ROLE;
 
-REVOKE ALL ON FUNCTION authz.role_available_in_organization(role_id uuid, organization_id uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION authz.role_available_in_organization(role_id uuid, organization_id uuid) TO authenticated;
+REVOKE ALL ON FUNCTION authz.role_available_in_organization(organization_id uuid, role_id uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.role_available_in_organization(organization_id uuid, role_id uuid) TO authenticated;
 
 -- 
 -- Utility function to insert permissions and associated to roles
@@ -487,11 +511,11 @@ GRANT EXECUTE ON FUNCTION authz.insert_role_permission(role_slugs text[], name t
 CREATE OR REPLACE FUNCTION authz.create_organization(name text)
   RETURNS authz.organizations
   LANGUAGE 'plpgsql'
-  SECURITY DEFINER SET search_path=authz
+  SECURITY DEFINER 
+  SET search_path=authz
   AS $BODY$
   DECLARE
     organization_id uuid = gen_random_uuid();
-    member_id uuid = gen_random_uuid();
     organization organizations;
   BEGIN
 
@@ -500,14 +524,15 @@ CREATE OR REPLACE FUNCTION authz.create_organization(name text)
       VALUES(organization_id, name);
 
     --   create membership in the organization
-    INSERT INTO authz.members(id, organization_id, user_id)
-      VALUES(member_id, organization_id, auth.uid());
+    INSERT INTO authz.members(organization_id, user_id)
+      VALUES(organization_id, auth.uid());
 
     --   make the creator the owner in the new org
-    INSERT  INTO authz.member_roles(role_id, member_id)
+    INSERT  INTO authz.member_roles(organization_id, user_id, role_id)
       VALUES(
-        (SELECT id FROM authz.roles r WHERE r.slug = 'owner'),
-        member_id
+        organization_id,
+        auth.uid(),
+        (SELECT id FROM authz.roles r WHERE r.slug = 'owner')
       );
     SELECT * FROM authz.organizations INTO organization WHERE id = organization_id;
     return organization;
@@ -591,33 +616,34 @@ CREATE OR REPLACE FUNCTION authz.edit_group(
     -- update name
     IF name IS NOT NULL THEN
       UPDATE authz.groups g SET g.name = name
-        WHERE g.id = group_id;
+        WHERE g.organization_id = organization_id AND g.id = group_id;
     END IF;
 
     -- update description
     IF description IS NOT NULL THEN
         UPDATE authz.groups g SET g.description = description
-            WHERE g.id = group_id;
+            WHERE g.organization_id = organization_id AND g.id = group_id;
     END IF;
 
     -- remove members
     IF array_length(remove_members, 1) > 0 THEN
         DELETE FROM authz.group_members gm
-            WHERE gm.member_id IN (remove_members);
+            WHERE gm.organization_id = organization_id AND gm.user_id IN (remove_members);
     END IF;
 
     -- add members
     IF array_length(add_members, 1) > 0 THEN
         SELECT member_id FROM authz.group_members gm
             INTO existing_members
-            WHERE gm.group_id = group_id AND gm.member_id IN (add_members);
+            WHERE gm.organization_id = organization_id AND gm.group_id = group_id AND gm.member_id IN (add_members);
         FOREACH member_id IN ARRAY add_members
         LOOP
             IF ARRAY[member_id] <@ exiting_members THEN
-                INSERT INTO authz.group_members (group_id, member_id) 
+                INSERT INTO authz.group_members (organization_id, group_id, member_id) 
                     VALUES (
+                        organization_id,
                         group_id,
-                        member_id
+                        auth.uid()
                     );
             END IF;
         END LOOP; 
@@ -633,12 +659,13 @@ CREATE OR REPLACE FUNCTION authz.edit_group(
     IF array_length(add_roles, 1) > 0 THEN
         SELECT role_id FROM authz.group_roles gr
             INTO existing_roles
-            WHERE gr.group_id = group_id AND gm.role_id IN (add_roles);
+            WHERE gr.organization_id = organization_id AND gr.group_id = group_id AND gm.role_id IN (add_roles);
         FOREACH role_id IN ARRAY add_roles
         LOOP
             IF ARRAY[role_id] <@ exiting_roles THEN
-                INSERT INTO authz.group_roles (group_id, role_id) 
+                INSERT INTO authz.group_roles (organization_id, group_id, role_id) 
                     VALUES (
+                        organization_id,
                         group_id,
                         role_id
                     );
@@ -790,10 +817,10 @@ CREATE POLICY "Requires permission `select-member` to view members role"
     TO authenticated
     USING (
         authz.has_permission_in_organization(
-        (SELECT organization_id FROM authz.members WHERE id = member_roles.member_id),
-        'select-member'
-    )
-);
+            member_roles.organization_id,
+            'select-member'
+        )
+    );
 
 CREATE POLICY "Require `edit-member` in org"
     ON authz.member_roles 
@@ -802,11 +829,11 @@ CREATE POLICY "Require `edit-member` in org"
     TO authenticated
     WITH CHECK (
         authz.has_permission_in_organization(
-            (SELECT organization_id FROM authz.members WHERE id = member_roles.member_id),
+            member_roles.organization_id,
             'edit-member'
         ) AND authz.role_available_in_organization(
-            member_roles.role_id,
-            (SELECT organization_id FROM authz.members WHERE id = member_roles.member_id)
+            member_roles.organization_id,
+            member_roles.role_id
         )
     );
 
@@ -817,8 +844,8 @@ CREATE POLICY "Requires permission `edit-member` to remove member's role"
     TO authenticated
     USING (
         authz.has_permission_in_organization(
-        (SELECT organization_id FROM authz.members WHERE id = member_roles.member_id),
-        'edit-member'
+            member_roles.organization_id,
+            'edit-member'
     )
 );
 
@@ -829,23 +856,23 @@ CREATE POLICY "Requires permission `edit-member` to update a member's role"
     TO authenticated
     USING (
         authz.has_permission_in_organization(
-            (SELECT organization_id FROM authz.members WHERE id = member_roles.member_id),
+            member_roles.organization_id,
             'edit-member'
         ) AND (
             authz.role_available_in_organization(
-                member_roles.role_id,
-                (SELECT organization_id FROM authz.members WHERE id = member_roles.member_id)
+                member_roles.organization_id,
+                member_roles.role_id
             )
         )
     )
     WITH CHECK (
         authz.has_permission_in_organization(
-            (SELECT organization_id FROM authz.members WHERE id = member_roles.member_id),
+            member_roles.organization_id,
             'edit-member'
         ) AND (
             authz.role_available_in_organization(
-                member_roles.role_id,
-                (SELECT organization_id FROM authz.members WHERE id = member_roles.member_id)
+                member_roles.organization_id,
+                member_roles.role_id
             )
         )
     )
@@ -901,7 +928,7 @@ CREATE POLICY "Require `insert-role` in org"
         )
     );
 
-CREATE POLICY "Only `CURRENT_ROLE` can updat system roles"
+CREATE POLICY "Only `CURRENT_ROLE` can update system roles"
     ON authz.roles 
     AS PERMISSIVE
     FOR UPDATE
@@ -1111,7 +1138,7 @@ CREATE POLICY "Require `select-group` OR membership"
     FOR SELECT
     TO authenticated
     USING (
-        authz.has_group_membership(groups.id) OR
+        authz.has_group_membership(groups.organization_id, groups.id) OR
         authz.has_permission_in_organization(
             groups.organization_id,
             'select-group'
@@ -1179,9 +1206,9 @@ CREATE POLICY "Require `select-group` OR membership"
     FOR SELECT
     TO authenticated
     USING (
-        authz.has_group_membership(group_members.group_id) OR 
+        authz.has_group_membership(group_members.organization_id, group_members.group_id) OR 
         authz.has_permission_in_organization(
-            (SELECT organization_id FROM authz.groups g WHERE g.id = group_members.group_id),
+            group_members.organization_id,
             'select-group'
     )
 );
@@ -1193,7 +1220,7 @@ CREATE POLICY "Require `edit-group` to add"
     TO authenticated
     WITH CHECK (
         authz.has_permission_in_organization(
-            (SELECT organization_id FROM authz.groups g WHERE g.id = group_members.group_id),
+            group_members.organization_id,
             'edit-group'
         )
     );
@@ -1205,7 +1232,7 @@ CREATE POLICY "Require `edit-group` to delete"
     TO authenticated
     USING (
         authz.has_permission_in_organization(
-            (SELECT organization_id FROM authz.groups g WHERE g.id = group_members.group_id),
+            group_members.organization_id,
             'edit-group'
         )
     );
@@ -1217,13 +1244,13 @@ CREATE POLICY "Require `edit-group` to update"
     TO authenticated
     USING (
         authz.has_permission_in_organization(
-            (SELECT organization_id FROM authz.groups g WHERE g.id = group_members.group_id),
+            group_members.organization_id,
             'edit-group'
         )
     )
     WITH CHECK (
         authz.has_permission_in_organization(
-            (SELECT organization_id FROM authz.groups g WHERE g.id = group_members.group_id),
+            group_members.organization_id,
             'edit-group'
         )
     )
@@ -1247,9 +1274,9 @@ CREATE POLICY "Require `select-group` / membership"
     FOR SELECT
     TO authenticated
     USING (
-        authz.has_group_membership(group_roles.group_id) OR
+        authz.has_group_membership(group_roles.organization_id, group_roles.group_id) OR
         authz.has_permission_in_organization(
-            (SELECT organization_id FROM authz.groups g WHERE g.id = group_roles.group_id),
+            group_roles.organization_id,
             'select-group'
     )
 );
@@ -1261,12 +1288,12 @@ CREATE POLICY "Require `edit-group` to add"
     TO authenticated
     WITH CHECK (
         authz.has_permission_in_organization(
-            (SELECT organization_id FROM authz.groups g WHERE g.id = group_roles.group_id),
+            group_roles.organization_id,
             'edit-group'
         ) AND
         authz.role_available_in_organization(
-            group_roles.role_id,
-            (SELECT organization_id FROM authz.groups g WHERE g.id = group_roles.group_id)
+            group_roles.organization_id,
+            group_roles.role_id
         )
     );
 
@@ -1281,8 +1308,8 @@ CREATE POLICY "Require `edit-group` to delete"
             'edit-group'
         ) AND
         authz.role_available_in_organization(
-            group_roles.role_id,
-            (SELECT organization_id FROM authz.groups g WHERE g.id = group_roles.group_id)
+            group_roles.organization_id,
+            group_roles.role_id
         )
     );
 
@@ -1293,22 +1320,22 @@ CREATE POLICY "Require `edit-group` to update"
     TO authenticated
     USING (
         authz.has_permission_in_organization(
-            (SELECT organization_id FROM authz.groups g WHERE g.id = group_roles.group_id),
+            group_roles.organization_id,
             'edit-group'
         ) AND
         authz.role_available_in_organization(
-            group_roles.role_id,
-            (SELECT organization_id FROM authz.groups g WHERE g.id = group_roles.group_id)
+            group_roles.organization_id,
+            group_roles.role_id
         )
     )
     WITH CHECK (
         authz.has_permission_in_organization(
-            (SELECT organization_id FROM authz.groups g WHERE g.id = group_roles.group_id),
+            group_roles.organization_id,
             'edit-group'
         ) AND
         authz.role_available_in_organization(
-            group_roles.role_id,
-            (SELECT organization_id FROM authz.groups g WHERE g.id = group_roles.group_id)
+            group_roles.organization_id,
+            group_roles.role_id
         )
     )
 ;

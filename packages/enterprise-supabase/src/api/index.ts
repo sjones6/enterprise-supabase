@@ -16,6 +16,7 @@ export type { CreateOrUpdateRole, IRolesClient } from "./roles";
 
 export { GroupsClient } from "./groups";
 export type {
+  CompositeGroupId,
   CreateGroup,
   UpdateGroup,
   UpdateGroupRolesAndMembersParams,
