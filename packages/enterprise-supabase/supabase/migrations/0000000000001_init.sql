@@ -271,9 +271,16 @@ CREATE TABLE IF NOT EXISTS authz.member_invitations
     expires_at timestamp with time zone,
     updated_at timestamp with time zone,
     created_at timestamp with time zone,
-    PRIMARY KEY (organization_id, email)
+    PRIMARY KEY (organization_id, email),
+    CHECK (email ~ '.+@.+\..+')
 )
 TABLESPACE pg_default;
+
+-- when not looking up invites for an organization,
+-- invites will be looked up by email address.
+CREATE INDEX IF NOT EXISTS authz_member_invitations_emails ON authz.member_invitations (email)
+    INCLUDE (organization_id)
+    TABLESPACE pg_default;
 
 CREATE TRIGGER member_invitations_timestamps
     BEFORE INSERT OR UPDATE 
@@ -822,7 +829,12 @@ CREATE POLICY "Require `select-organization` in org"
     AS PERMISSIVE
     FOR SELECT
     TO authenticated
-    USING ( authz.has_permission_in_organization(organizations.id, 'select-organization'::authz.permission) );
+    USING ( 
+        -- can see organization with permission
+        authz.has_permission_in_organization(organizations.id, 'select-organization'::authz.permission) OR
+        -- can see organization row details if they have an active invite.
+        (SELECT EXISTS(SELECT 1 FROM authz.member_invitations mi WHERE mi.organization_id = organizations.id AND mi.email = auth.jwt()->>'email'))
+    );
 
 CREATE POLICY "Users can create organizations"
     ON authz.organizations 
@@ -1447,6 +1459,7 @@ CREATE POLICY "Require `select-member`"
     FOR SELECT
     TO authenticated
     USING (
+        (SELECT EXISTS(SELECT 1 FROM authz.member_invitations mi WHERE mi.email = auth.jwt()->>'email')) OR
         authz.has_permission_in_organization(
             member_invitations.organization_id,
             'select-member'::authz.permission
@@ -1514,6 +1527,7 @@ CREATE POLICY "Require `select-role` and `select-member`"
     FOR SELECT
     TO authenticated
     USING (
+
         authz.has_all_permissions_in_organization(
             member_invitation_roles.organization_id,
             ARRAY['select-role', 'select-member']::authz.permission[]
