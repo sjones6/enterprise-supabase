@@ -10,10 +10,10 @@ export type CreateOrUpdateRole = {
 
 export interface IRolesClient {
   create(role: CreateOrUpdateRole): Promise<Role>;
-  getById(groupId: string): Promise<Role>;
+  getById(roleId: string): Promise<Role>;
   list(): Promise<Role[]>;
-  updateById(groupId: string, role: CreateOrUpdateRole): Promise<Role>;
-  deleteById(groupId: string): Promise<unknown>;
+  updateById(roleId: string, role: CreateOrUpdateRole): Promise<Role>;
+  deleteById(roleId: string): Promise<unknown>;
 }
 
 export class RolesClient implements IRolesClient {
@@ -76,13 +76,13 @@ export class RolesClient implements IRolesClient {
     );
   }
 
-  async deleteById(groupId: string) {
+  async deleteById(roleId: string) {
     return unwrapPostgrestSingleReponse(
       await this.supabase
         .schema("authz")
-        .from("groups")
+        .from("roles")
         .delete()
-        .eq("id", groupId)
+        .eq("id", roleId)
         .single()
         .throwOnError()
     );

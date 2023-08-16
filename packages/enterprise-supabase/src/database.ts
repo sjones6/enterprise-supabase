@@ -13,35 +13,47 @@ export interface Database {
         Row: {
           created_at: string | null;
           group_id: string;
-          id: string;
-          member_id: string;
+          organization_id: string;
           updated_at: string | null;
+          user_id: string;
         };
         Insert: {
           created_at?: string | null;
           group_id: string;
-          id?: string;
-          member_id: string;
+          organization_id: string;
           updated_at?: string | null;
+          user_id: string;
         };
         Update: {
           created_at?: string | null;
           group_id?: string;
-          id?: string;
-          member_id?: string;
+          organization_id?: string;
           updated_at?: string | null;
+          user_id?: string;
         };
         Relationships: [
           {
-            foreignKeyName: "group_members_group_id_fkey";
-            columns: ["group_id"];
-            referencedRelation: "groups";
+            foreignKeyName: "group_members_organization_id_fkey";
+            columns: ["organization_id"];
+            referencedRelation: "organizations";
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "group_members_member_id_fkey";
-            columns: ["member_id"];
+            foreignKeyName: "group_members_organization_id_group_id_fkey";
+            columns: ["organization_id", "group_id"];
+            referencedRelation: "groups";
+            referencedColumns: ["organization_id", "id"];
+          },
+          {
+            foreignKeyName: "group_members_organization_id_user_id_fkey";
+            columns: ["organization_id", "user_id"];
             referencedRelation: "members";
+            referencedColumns: ["organization_id", "user_id"];
+          },
+          {
+            foreignKeyName: "group_members_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
             referencedColumns: ["id"];
           }
         ];
@@ -50,30 +62,36 @@ export interface Database {
         Row: {
           created_at: string | null;
           group_id: string;
-          id: string;
+          organization_id: string;
           role_id: string;
           updated_at: string | null;
         };
         Insert: {
           created_at?: string | null;
           group_id: string;
-          id?: string;
+          organization_id: string;
           role_id: string;
           updated_at?: string | null;
         };
         Update: {
           created_at?: string | null;
           group_id?: string;
-          id?: string;
+          organization_id?: string;
           role_id?: string;
           updated_at?: string | null;
         };
         Relationships: [
           {
-            foreignKeyName: "group_roles_group_id_fkey";
-            columns: ["group_id"];
-            referencedRelation: "groups";
+            foreignKeyName: "group_roles_organization_id_fkey";
+            columns: ["organization_id"];
+            referencedRelation: "organizations";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "group_roles_organization_id_group_id_fkey";
+            columns: ["organization_id", "group_id"];
+            referencedRelation: "groups";
+            referencedColumns: ["organization_id", "id"];
           },
           {
             foreignKeyName: "group_roles_role_id_fkey";
@@ -120,36 +138,48 @@ export interface Database {
       member_roles: {
         Row: {
           created_at: string | null;
-          id: string;
-          member_id: string;
+          organization_id: string;
           role_id: string;
           updated_at: string | null;
+          user_id: string;
         };
         Insert: {
           created_at?: string | null;
-          id?: string;
-          member_id: string;
+          organization_id: string;
           role_id: string;
           updated_at?: string | null;
+          user_id: string;
         };
         Update: {
           created_at?: string | null;
-          id?: string;
-          member_id?: string;
+          organization_id?: string;
           role_id?: string;
           updated_at?: string | null;
+          user_id?: string;
         };
         Relationships: [
           {
-            foreignKeyName: "member_roles_member_id_fkey";
-            columns: ["member_id"];
-            referencedRelation: "members";
+            foreignKeyName: "member_roles_organization_id_fkey";
+            columns: ["organization_id"];
+            referencedRelation: "organizations";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "member_roles_organization_id_user_id_fkey";
+            columns: ["organization_id", "user_id"];
+            referencedRelation: "members";
+            referencedColumns: ["organization_id", "user_id"];
           },
           {
             foreignKeyName: "member_roles_role_id_fkey";
             columns: ["role_id"];
             referencedRelation: "roles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "member_roles_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
             referencedColumns: ["id"];
           }
         ];
@@ -157,21 +187,18 @@ export interface Database {
       members: {
         Row: {
           created_at: string | null;
-          id: string;
           organization_id: string;
           updated_at: string | null;
           user_id: string;
         };
         Insert: {
           created_at?: string | null;
-          id?: string;
           organization_id: string;
           updated_at?: string | null;
           user_id: string;
         };
         Update: {
           created_at?: string | null;
-          id?: string;
           organization_id?: string;
           updated_at?: string | null;
           user_id?: string;
@@ -218,7 +245,7 @@ export interface Database {
           description: string;
           id: string;
           name: string;
-          slug: string;
+          slug: Database["authz"]["Enums"]["permission"];
           updated_at: string | null;
         };
         Insert: {
@@ -226,7 +253,7 @@ export interface Database {
           description?: string;
           id?: string;
           name: string;
-          slug: string;
+          slug: Database["authz"]["Enums"]["permission"];
           updated_at?: string | null;
         };
         Update: {
@@ -234,7 +261,7 @@ export interface Database {
           description?: string;
           id?: string;
           name?: string;
-          slug?: string;
+          slug?: Database["authz"]["Enums"]["permission"];
           updated_at?: string | null;
         };
         Relationships: [];
@@ -346,7 +373,7 @@ export interface Database {
         Args: {
           organization_id: string;
         };
-        Returns: string[];
+        Returns: Database["authz"]["Enums"]["permission"][];
       };
       get_permissions_in_organization: {
         Args: {
@@ -357,19 +384,20 @@ export interface Database {
       has_all_permissions_in_organization: {
         Args: {
           organization_id: string;
-          permission: string[];
+          permission: Database["authz"]["Enums"]["permission"][];
         };
         Returns: boolean;
       };
       has_any_permission_in_organization: {
         Args: {
           organization_id: string;
-          permission: string[];
+          permission: Database["authz"]["Enums"]["permission"][];
         };
         Returns: boolean;
       };
       has_group_membership: {
         Args: {
+          organization_id: string;
           group_id: string;
         };
         Returns: boolean;
@@ -377,7 +405,7 @@ export interface Database {
       has_permission_in_organization: {
         Args: {
           organization_id: string;
-          permission: string;
+          permission: Database["authz"]["Enums"]["permission"];
         };
         Returns: boolean;
       };
@@ -385,15 +413,15 @@ export interface Database {
         Args: {
           role_slugs: string[];
           name: string;
-          permission_slug: string;
+          permission_slug: Database["authz"]["Enums"]["permission"];
           description: string;
         };
         Returns: undefined;
       };
       role_available_in_organization: {
         Args: {
-          role_id: string;
           organization_id: string;
+          role_id: string;
         };
         Returns: boolean;
       };
@@ -405,14 +433,29 @@ export interface Database {
       };
     };
     Enums: {
-      [_ in never]: never;
+      permission:
+        | "delete-organization"
+        | "edit-organization"
+        | "select-organization"
+        | "delete-member"
+        | "add-member"
+        | "edit-member"
+        | "select-member"
+        | "delete-role"
+        | "add-role"
+        | "edit-role"
+        | "select-role"
+        | "delete-group"
+        | "add-group"
+        | "edit-group"
+        | "select-group";
     };
     CompositeTypes: {
       permissions_row: {
         id: string;
         name: string;
         description: string;
-        slug: string;
+        slug: Database["authz"]["Enums"]["permission"];
         updated_at: string;
         created_at: string;
       };

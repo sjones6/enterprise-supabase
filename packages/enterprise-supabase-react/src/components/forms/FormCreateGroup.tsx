@@ -59,10 +59,7 @@ export const FormCreateGroup = (
   async function onSubmit(values: FormSchema) {
     try {
       if (primaryOrganization) {
-        const res = await mutateAsync({
-          ...values,
-          organization_id: primaryOrganization.id,
-        });
+        const res = await mutateAsync(values);
         props.onSuccess && props.onSuccess(res);
       }
     } catch (err) {
