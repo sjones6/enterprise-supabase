@@ -261,6 +261,78 @@ CREATE TRIGGER group_members_timestamps
     FOR EACH ROW
     EXECUTE FUNCTION authz.add_timestamps();
 
+-- Member Invitations
+CREATE TABLE IF NOT EXISTS authz.member_invitations
+(
+    organization_id uuid NOT NULL REFERENCES authz.organizations (id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE,
+    email text NOT NULL,
+    expires_at timestamp with time zone,
+    updated_at timestamp with time zone,
+    created_at timestamp with time zone,
+    PRIMARY KEY (organization_id, email)
+)
+TABLESPACE pg_default;
+
+CREATE TRIGGER member_invitations_timestamps
+    BEFORE INSERT OR UPDATE 
+    ON authz.member_invitations
+    FOR EACH ROW
+    EXECUTE FUNCTION authz.add_timestamps();
+
+-- Member invitation groups
+CREATE TABLE IF NOT EXISTS authz.member_invitation_groups
+(
+    organization_id uuid NOT NULL REFERENCES authz.organizations (id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE,
+    group_id uuid NOT NULL,
+    email text NOT NULL,
+    updated_at timestamp with time zone,
+    created_at timestamp with time zone,
+    PRIMARY KEY (organization_id, email, group_id),
+    FOREIGN KEY (organization_id, group_id) REFERENCES authz.groups (organization_id, id)
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE,
+    FOREIGN KEY (organization_id, email) REFERENCES authz.member_invitations (organization_id, email)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+)
+TABLESPACE pg_default;
+
+CREATE TRIGGER member_invitation_groups_timestamps
+    BEFORE INSERT OR UPDATE 
+    ON authz.member_invitation_groups
+    FOR EACH ROW
+    EXECUTE FUNCTION authz.add_timestamps();
+
+
+-- Member invitation roles
+CREATE TABLE IF NOT EXISTS authz.member_invitation_roles
+(
+    organization_id uuid NOT NULL REFERENCES authz.organizations (id) MATCH SIMPLE
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE,
+    role_id uuid NOT NULL REFERENCES authz.roles (id)
+        ON UPDATE NO ACTION
+        ON DELETE CASCADE,
+    email text NOT NULL,
+    updated_at timestamp with time zone,
+    created_at timestamp with time zone,
+    PRIMARY KEY (organization_id, email, role_id),
+    FOREIGN KEY (organization_id, email) REFERENCES authz.member_invitations (organization_id, email)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+)
+TABLESPACE pg_default;
+
+CREATE TRIGGER member_invitation_roles_timestamps
+    BEFORE INSERT OR UPDATE 
+    ON authz.member_invitation_roles
+    FOR EACH ROW
+    EXECUTE FUNCTION authz.add_timestamps();
+
 -- 
 -- Functions
 -- 
@@ -727,7 +799,6 @@ GRANT EXECUTE ON FUNCTION authz.edit_group(
     add_roles uuid[],
     remove_roles uuid[]
 ) TO authenticated;
- 
 
 
 -- 
@@ -1354,6 +1425,217 @@ CREATE POLICY "Require `edit-group` to update"
         authz.role_available_in_organization(
             group_roles.organization_id,
             group_roles.role_id
+        )
+    )
+;
+
+-- Member Invitations
+ALTER TABLE IF EXISTS authz.member_invitations
+    OWNER to CURRENT_ROLE;
+
+ALTER TABLE IF EXISTS authz.member_invitations
+    ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE authz.member_invitations FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE authz.member_invitations TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE authz.member_invitations TO service_role;
+GRANT ALL ON TABLE authz.member_invitations TO CURRENT_ROLE;
+
+CREATE POLICY "Require `select-member`"
+    ON authz.member_invitations 
+    AS PERMISSIVE
+    FOR SELECT
+    TO authenticated
+    USING (
+        authz.has_permission_in_organization(
+            member_invitations.organization_id,
+            'select-member'::authz.permission
+        )
+);
+
+CREATE POLICY "Require `add-member`"
+    ON authz.member_invitations 
+    AS PERMISSIVE
+    FOR INSERT
+    TO authenticated
+    WITH CHECK (
+        authz.has_permission_in_organization(
+            member_invitations.organization_id,
+            'add-member'::authz.permission
+        )
+    );
+
+CREATE POLICY "Require `delete-member`"
+    ON authz.member_invitations
+    AS PERMISSIVE
+    FOR DELETE
+    TO authenticated
+    USING (
+        authz.has_permission_in_organization(
+            member_invitations.organization_id,
+            'delete-member'::authz.permission
+        )
+    );
+
+CREATE POLICY "Require `edit-member`"
+    ON authz.member_invitations 
+    AS PERMISSIVE
+    FOR UPDATE
+    TO authenticated
+    USING (
+        authz.has_permission_in_organization(
+            member_invitations.organization_id,
+            'edit-member'::authz.permission
+        )
+    )
+    WITH CHECK (
+        authz.has_permission_in_organization(
+            member_invitations.organization_id,
+            'edit-member'::authz.permission
+        )
+    )
+;
+
+-- Member Invitation Roles
+ALTER TABLE IF EXISTS authz.member_invitation_roles
+    OWNER to CURRENT_ROLE;
+
+ALTER TABLE IF EXISTS authz.member_invitation_roles
+    ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE authz.member_invitation_roles FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE authz.member_invitation_roles TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE authz.member_invitation_roles TO service_role;
+GRANT ALL ON TABLE authz.member_invitation_roles TO CURRENT_ROLE;
+
+CREATE POLICY "Require `select-role` and `select-member`"
+    ON authz.member_invitation_roles 
+    AS PERMISSIVE
+    FOR SELECT
+    TO authenticated
+    USING (
+        authz.has_all_permissions_in_organization(
+            member_invitation_roles.organization_id,
+            ARRAY['select-role', 'select-member']::authz.permission[]
+        ) AND
+        authz.role_available_in_organization(member_invitation_roles.organization_id, member_invitation_roles.role_id)
+);
+
+CREATE POLICY "Require `select-role` AND/OR `add-member`/`edit-member` to add"
+    ON authz.member_invitation_roles 
+    AS PERMISSIVE
+    FOR INSERT
+    TO authenticated
+    WITH CHECK (
+        authz.has_permission_in_organization(
+            member_invitation_roles.organization_id,
+            'select-role'::authz.permission
+        ) AND
+        authz.has_any_permission_in_organization(
+            member_invitation_roles.organization_id,
+            ARRAY['add-member', 'edit-member']::authz.permission[]
+        ) AND
+        authz.role_available_in_organization(member_invitation_roles.organization_id, member_invitation_roles.role_id)
+    );
+
+CREATE POLICY "Require `select-role` and `edit-member` to delete"
+    ON authz.member_invitation_roles
+    AS PERMISSIVE
+    FOR DELETE
+    TO authenticated
+    USING (
+        authz.has_all_permissions_in_organization(
+            member_invitation_roles.organization_id,
+            ARRAY['select-role', 'edit-member']::authz.permission[]
+        ) AND
+        authz.role_available_in_organization(member_invitation_roles.organization_id, member_invitation_roles.role_id)
+    );
+
+CREATE POLICY "Require `edit-member` and `select-role` to update"
+    ON authz.member_invitation_roles 
+    AS PERMISSIVE
+    FOR UPDATE
+    TO authenticated
+    USING (
+        authz.has_all_permissions_in_organization(
+            member_invitation_roles.organization_id,
+            ARRAY['select-role', 'edit-member']::authz.permission[]
+        ) AND
+        authz.role_available_in_organization(member_invitation_roles.organization_id, member_invitation_roles.role_id)
+    )
+    WITH CHECK (
+        authz.has_all_permissions_in_organization(
+            member_invitation_roles.organization_id,
+            ARRAY['select-role', 'edit-member']::authz.permission[]
+        ) AND
+        authz.role_available_in_organization(member_invitation_roles.organization_id, member_invitation_roles.role_id)
+    )
+;
+
+-- Member Invitation Groups
+ALTER TABLE IF EXISTS authz.member_invitation_groups
+    OWNER to CURRENT_ROLE;
+
+ALTER TABLE IF EXISTS authz.member_invitation_groups
+    ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE authz.member_invitation_groups FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE authz.member_invitation_groups TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE authz.member_invitation_groups TO service_role;
+GRANT ALL ON TABLE authz.member_invitation_groups TO CURRENT_ROLE;
+
+CREATE POLICY "Require `select-role` and `select-member`"
+    ON authz.member_invitation_groups 
+    AS PERMISSIVE
+    FOR SELECT
+    TO authenticated
+    USING (
+        authz.has_all_permissions_in_organization(
+            member_invitation_groups.organization_id,
+            ARRAY['select-group', 'select-member']::authz.permission[]
+        )
+);
+
+CREATE POLICY "Require 'select-group' AND/OR `add-member`/`edit-member` to add"
+    ON authz.member_invitation_groups 
+    AS PERMISSIVE
+    FOR INSERT
+    TO authenticated
+    WITH CHECK (
+        authz.has_permission_in_organization(member_invitation_groups.organization_id, 'select-group'::authz.permission) AND
+        authz.has_any_permission_in_organization(
+            member_invitation_groups.organization_id,
+            ARRAY['add-member', 'edit-member']::authz.permission[]
+        )
+    );
+
+CREATE POLICY "Require `select-group` and `edit-member` to delete"
+    ON authz.member_invitation_groups
+    AS PERMISSIVE
+    FOR DELETE
+    TO authenticated
+    USING (
+        authz.has_all_permissions_in_organization(
+            member_invitation_groups.organization_id,
+            ARRAY['select-group', 'edit-member']::authz.permission[]
+        )
+    );
+
+CREATE POLICY "Require `edit-member` and `select-gruop` to update"
+    ON authz.member_invitation_groups 
+    AS PERMISSIVE
+    FOR UPDATE
+    TO authenticated
+    USING (
+        authz.has_all_permissions_in_organization(
+            member_invitation_groups.organization_id,
+            ARRAY['select-group', 'edit-member']::authz.permission[]
+        )
+    )
+    WITH CHECK (
+        authz.has_all_permissions_in_organization(
+            member_invitation_groups.organization_id,
+            ARRAY['select-group', 'edit-member']::authz.permission[]
         )
     )
 ;
