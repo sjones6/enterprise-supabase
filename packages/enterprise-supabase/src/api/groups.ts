@@ -53,7 +53,10 @@ export type UpdateGroupRolesAndMembersParams = {
 export interface IGroupsClient {
   create(group: CreateGroup): Promise<Group>;
   getById(id: CompositeGroupId): Promise<Group>;
-  list(organizationId: string, pagination?: Pagination<Group>): Promise<PaginatedResponse<Group>>;
+  list(
+    organizationId: string,
+    pagination?: Pagination<Group>
+  ): Promise<PaginatedResponse<Group>>;
   updateById(id: CompositeGroupId, group: UpdateGroup): Promise<Group>;
   deleteById(id: CompositeGroupId): Promise<unknown>;
   updateGroupRolesAndMembers(
@@ -82,20 +85,23 @@ export class GroupsClient implements IGroupsClient {
         .schema("authz")
         .from("groups")
         .select()
-        .eq('organization_id', organizationId)
+        .eq("organization_id", organizationId)
         .eq("id", groupId)
         .single()
         .throwOnError()
     );
   }
 
-  async list(organizationId: string, pagination: Pagination<Group>): Promise<PaginatedResponse<Group>> {
+  async list(
+    organizationId: string,
+    pagination: Pagination<Group>
+  ): Promise<PaginatedResponse<Group>> {
     const { from, to } = calculatePagination(pagination);
     let query = this.supabase
       .schema("authz")
       .from("groups")
       .select("*", { count: "exact" })
-      .eq('organization_id', organizationId)
+      .eq("organization_id", organizationId)
       .range(from, to);
     if (pagination.orderBy) {
       query = query.order(pagination.orderBy, {
@@ -105,13 +111,16 @@ export class GroupsClient implements IGroupsClient {
     return paginateResponse<Group>(await query.throwOnError(), pagination);
   }
 
-  async updateById([organizationId, groupId]: CompositeGroupId, group: UpdateGroup): Promise<Group> {
+  async updateById(
+    [organizationId, groupId]: CompositeGroupId,
+    group: UpdateGroup
+  ): Promise<Group> {
     return unwrapPostgrestSingleReponse(
       await this.supabase
         .schema("authz")
         .from("groups")
         .update(group)
-        .eq('organization_id', organizationId)
+        .eq("organization_id", organizationId)
         .eq("id", groupId)
         .select()
         .single()
@@ -125,7 +134,7 @@ export class GroupsClient implements IGroupsClient {
         .schema("authz")
         .from("groups")
         .delete()
-        .eq('organization_id', organizationId)
+        .eq("organization_id", organizationId)
         .eq("id", groupId)
         .single()
         .throwOnError()

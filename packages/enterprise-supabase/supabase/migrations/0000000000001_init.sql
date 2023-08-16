@@ -101,11 +101,29 @@ CREATE TRIGGER roles_timestamps
     EXECUTE FUNCTION authz.add_timestamps();
 
 -- Permissions
+CREATE TYPE authz.permission AS ENUM (
+    'delete-organization',
+    'edit-organization',
+    'select-organization',
+    'delete-member',
+    'add-member',
+    'edit-member',
+    'select-member',
+    'delete-role',
+    'add-role',
+    'edit-role',
+    'select-role',
+    'delete-group',
+    'add-group',
+    'edit-group',
+    'select-group'
+);
+
 CREATE TABLE IF NOT EXISTS authz.permissions
 (
     id uuid PRIMARY KEY NOT NULL DEFAULT gen_random_uuid(),
     name text NOT NULL COLLATE pg_catalog."default",
-    slug text NOT NULL UNIQUE COLLATE pg_catalog."default",
+    slug authz.permission NOT NULL UNIQUE,
     description text NOT NULL COLLATE pg_catalog."default" DEFAULT '',
     updated_at timestamp with time zone,
     created_at timestamp with time zone
@@ -259,7 +277,7 @@ CREATE TYPE authz.permissions_row AS (
     id uuid,
     name text,
     description text,
-    slug text,
+    slug authz.permission,
     updated_at timestamp with time zone,
     created_at timestamp with time zone
 );
@@ -307,7 +325,7 @@ GRANT EXECUTE ON FUNCTION authz.get_permissions_in_organization(organization_id 
 CREATE OR REPLACE FUNCTION authz.get_permission_slugs_in_organization(
     organization_id uuid
 	)
-    RETURNS SETOF text
+    RETURNS SETOF authz.permission
     LANGUAGE 'sql'
     COST 100
     STABLE SECURITY DEFINER 
@@ -329,7 +347,7 @@ GRANT EXECUTE ON FUNCTION authz.get_permission_slugs_in_organization(organizatio
 -- 
 CREATE OR REPLACE FUNCTION authz.has_permission_in_organization(
     organization_id uuid,
-    permission text
+    permission authz.permission
 )
     RETURNS boolean
     LANGUAGE 'sql'
@@ -344,18 +362,18 @@ AS $BODY$
     );
 $BODY$;
 
-ALTER FUNCTION authz.has_permission_in_organization(organization_id uuid, permission text)
+ALTER FUNCTION authz.has_permission_in_organization(organization_id uuid, permission authz.permission)
     OWNER TO CURRENT_ROLE;
 
-REVOKE ALL ON FUNCTION authz.has_permission_in_organization(organization_id uuid, permission text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION authz.has_permission_in_organization(organization_id uuid, permission text) TO authenticated;
+REVOKE ALL ON FUNCTION authz.has_permission_in_organization(organization_id uuid, permission authz.permission) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.has_permission_in_organization(organization_id uuid, permission authz.permission) TO authenticated;
 
 -- 
 -- Check if the authenticated user's permissions overlaps with any one of a list of permissions.
 -- 
 CREATE OR REPLACE FUNCTION authz.has_any_permission_in_organization(
     organization_id uuid,
-    permission text[]
+    permission authz.permission[]
 	)
     RETURNS boolean
     LANGUAGE 'plpgsql'
@@ -373,18 +391,18 @@ AS $BODY$
     END;
 $BODY$;
 
-ALTER FUNCTION authz.has_any_permission_in_organization(organization_id uuid, permission text[])
+ALTER FUNCTION authz.has_any_permission_in_organization(organization_id uuid, permission authz.permission[])
     OWNER TO CURRENT_ROLE;
 
-REVOKE ALL ON FUNCTION authz.has_any_permission_in_organization(organization_id uuid, permission text[]) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION authz.has_any_permission_in_organization(organization_id uuid, permission text[]) TO authenticated;
+REVOKE ALL ON FUNCTION authz.has_any_permission_in_organization(organization_id uuid, permission authz.permission[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.has_any_permission_in_organization(organization_id uuid, permission authz.permission[]) TO authenticated;
 
 -- 
 -- Check if authenticted user has a list of permissions.
 -- 
 CREATE OR REPLACE FUNCTION authz.has_all_permissions_in_organization(
     organization_id uuid,
-    permission text[]
+    permission authz.permission[]
 	)
     RETURNS boolean
     LANGUAGE 'plpgsql'
@@ -402,11 +420,11 @@ AS $BODY$
     END;
 $BODY$;
 
-ALTER FUNCTION authz.has_all_permissions_in_organization(organization_id uuid, permission text[])
+ALTER FUNCTION authz.has_all_permissions_in_organization(organization_id uuid, permission authz.permission[])
     OWNER TO CURRENT_ROLE;
 
-REVOKE ALL ON FUNCTION authz.has_all_permissions_in_organization(organization_id uuid, permission text[]) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION authz.has_all_permissions_in_organization(organization_id uuid, permission text[]) TO authenticated;
+REVOKE ALL ON FUNCTION authz.has_all_permissions_in_organization(organization_id uuid, permission authz.permission[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.has_all_permissions_in_organization(organization_id uuid, permission authz.permission[]) TO authenticated;
 
 -- 
 -- Check if user has group membership
@@ -467,7 +485,7 @@ GRANT EXECUTE ON FUNCTION authz.role_available_in_organization(organization_id u
 -- Utility function to insert permissions and associated to roles
 -- 
 -- 
-CREATE OR REPLACE FUNCTION authz.insert_role_permission(role_slugs text[], name text, permission_slug text, description text)
+CREATE OR REPLACE FUNCTION authz.insert_role_permission(role_slugs text[], name text, permission_slug authz.permission, description text)
   RETURNS void
   SET search_path=authz
 AS $$
@@ -499,11 +517,11 @@ END;
 $$
 LANGUAGE plpgsql;
 
-ALTER FUNCTION authz.insert_role_permission(role_slugs text[], name text, permission_slug text, description text)
+ALTER FUNCTION authz.insert_role_permission(role_slugs text[], name text, permission_slug authz.permission, description text)
     OWNER TO CURRENT_ROLE;
 
-REVOKE ALL ON FUNCTION authz.insert_role_permission(role_slugs text[], name text, permission_slug text, description text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION authz.insert_role_permission(role_slugs text[], name text, permission_slug text, description text) TO CURRENT_ROLE;
+REVOKE ALL ON FUNCTION authz.insert_role_permission(role_slugs text[], name text, permission_slug authz.permission, description text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.insert_role_permission(role_slugs text[], name text, permission_slug authz.permission, description text) TO CURRENT_ROLE;
 
 -- 
 -- Create organization, and assign initial role to creating user
@@ -733,7 +751,7 @@ CREATE POLICY "Require `select-organization` in org"
     AS PERMISSIVE
     FOR SELECT
     TO authenticated
-    USING ( authz.has_permission_in_organization(organizations.id, 'select-organization') );
+    USING ( authz.has_permission_in_organization(organizations.id, 'select-organization'::authz.permission) );
 
 CREATE POLICY "Users can create organizations"
     ON authz.organizations 
@@ -747,15 +765,15 @@ CREATE POLICY "Require `delete-organization` in org"
     AS PERMISSIVE
     FOR DELETE
     TO authenticated
-    USING ( authz.has_permission_in_organization(organizations.id, 'delete-organization') );
+    USING ( authz.has_permission_in_organization(organizations.id, 'delete-organization'::authz.permission) );
 
 CREATE POLICY "Require `edit-organization` in org"
     ON authz.organizations 
     AS PERMISSIVE
     FOR UPDATE
     TO authenticated
-    USING ( authz.has_permission_in_organization(organizations.id, 'edit-organization') )
-    WITH CHECK ( authz.has_permission_in_organization(organizations.id, 'edit-organization') );
+    USING ( authz.has_permission_in_organization(organizations.id, 'edit-organization'::authz.permission) )
+    WITH CHECK ( authz.has_permission_in_organization(organizations.id, 'edit-organization'::authz.permission) );
 
 -- Members
 ALTER TABLE IF EXISTS authz.members
@@ -774,29 +792,29 @@ CREATE POLICY "Requires permission `select-member` to select member"
     AS PERMISSIVE
     FOR SELECT
     TO public
-    USING ( authz.has_permission_in_organization(members.organization_id, 'select-member') );
+    USING ( authz.has_permission_in_organization(members.organization_id, 'select-member'::authz.permission) );
 
 CREATE POLICY "Requires permission `add-member` to add member"
     ON authz.members 
     AS PERMISSIVE
     FOR INSERT
     TO public
-    WITH CHECK ( authz.has_permission_in_organization(members.organization_id, 'add-member') );
+    WITH CHECK ( authz.has_permission_in_organization(members.organization_id, 'add-member'::authz.permission) );
 
 CREATE POLICY "Requires permission `delete-member` to remove member"
     ON authz.members
     AS PERMISSIVE
     FOR DELETE
     TO public
-    USING ( authz.has_permission_in_organization(members.organization_id, 'delete-member') );
+    USING ( authz.has_permission_in_organization(members.organization_id, 'delete-member'::authz.permission) );
 
 CREATE POLICY "Requires permission `edit-member` to update member"
     ON authz.members 
     AS PERMISSIVE
     FOR UPDATE
     TO public
-    USING ( authz.has_permission_in_organization(members.organization_id, 'edit-member') )
-    WITH CHECK ( authz.has_permission_in_organization(members.organization_id, 'edit-member') );
+    USING ( authz.has_permission_in_organization(members.organization_id, 'edit-member'::authz.permission) )
+    WITH CHECK ( authz.has_permission_in_organization(members.organization_id, 'edit-member'::authz.permission) );
 
 -- Member Roles (join)
 ALTER TABLE IF EXISTS authz.member_roles
@@ -818,7 +836,7 @@ CREATE POLICY "Requires permission `select-member` to view members role"
     USING (
         authz.has_permission_in_organization(
             member_roles.organization_id,
-            'select-member'
+            'select-member'::authz.permission
         )
     );
 
@@ -830,7 +848,7 @@ CREATE POLICY "Require `edit-member` in org"
     WITH CHECK (
         authz.has_permission_in_organization(
             member_roles.organization_id,
-            'edit-member'
+            'edit-member'::authz.permission
         ) AND authz.role_available_in_organization(
             member_roles.organization_id,
             member_roles.role_id
@@ -845,7 +863,7 @@ CREATE POLICY "Requires permission `edit-member` to remove member's role"
     USING (
         authz.has_permission_in_organization(
             member_roles.organization_id,
-            'edit-member'
+            'edit-member'::authz.permission
     )
 );
 
@@ -857,7 +875,7 @@ CREATE POLICY "Requires permission `edit-member` to update a member's role"
     USING (
         authz.has_permission_in_organization(
             member_roles.organization_id,
-            'edit-member'
+            'edit-member'::authz.permission
         ) AND (
             authz.role_available_in_organization(
                 member_roles.organization_id,
@@ -868,7 +886,7 @@ CREATE POLICY "Requires permission `edit-member` to update a member's role"
     WITH CHECK (
         authz.has_permission_in_organization(
             member_roles.organization_id,
-            'edit-member'
+            'edit-member'::authz.permission
         ) AND (
             authz.role_available_in_organization(
                 member_roles.organization_id,
@@ -905,7 +923,7 @@ CREATE POLICY "Require `select-role` in org"
     USING ( 
         authz.has_permission_in_organization(
             roles.organization_id,
-            'select-role'
+            'select-role'::authz.permission
         )
     );
 
@@ -916,7 +934,7 @@ CREATE POLICY "Only `CURRENT_ROLE` can insert system roles"
     TO CURRENT_ROLE
     WITH CHECK ( roles.organization_id IS NULL );
 
-CREATE POLICY "Require `insert-role` in org"
+CREATE POLICY "Require `add-role` in org"
     ON authz.roles 
     AS PERMISSIVE
     FOR INSERT
@@ -924,7 +942,7 @@ CREATE POLICY "Require `insert-role` in org"
     WITH CHECK ( 
         authz.has_permission_in_organization(
             roles.organization_id,
-            'insert-role'
+            'add-role'::authz.permission
         )
     );
 
@@ -944,13 +962,13 @@ CREATE POLICY "Require `update-role` in org"
     USING ( 
         authz.has_permission_in_organization(
             roles.organization_id,
-            'edit-role'
+            'edit-role'::authz.permission
         )
      )
     WITH CHECK ( 
         authz.has_permission_in_organization(
             roles.organization_id,
-            'edit-role'
+            'edit-role'::authz.permission
         )
      );
 
@@ -969,7 +987,7 @@ CREATE POLICY "Require `delete-role` in org"
     USING ( 
         authz.has_permission_in_organization(
             roles.organization_id,
-            'delete-role'
+            'delete-role'::authz.permission
         )
      );
 
@@ -1043,7 +1061,7 @@ CREATE POLICY "Select requires `select-role` in org"
     USING ( 
         authz.has_permission_in_organization(
             (SELECT organization_id FROM authz.roles WHERE id = role_permissions.role_id),
-            'select-role'
+            'select-role'::authz.permission
         )
      );
 
@@ -1064,7 +1082,7 @@ CREATE POLICY "Insert requires `edit-role` in org"
     WITH CHECK ( 
         authz.has_permission_in_organization(
             (SELECT organization_id FROM authz.roles WHERE id = role_permissions.role_id),
-            'edit-role'
+            'edit-role'::authz.permission
         )
      );
 
@@ -1088,13 +1106,13 @@ CREATE POLICY "Update requires `edit-role` in org"
     USING (
         authz.has_permission_in_organization(
             (SELECT organization_id FROM authz.roles WHERE id = role_permissions.role_id),
-            'edit-role'
+            'edit-role'::authz.permission
         )
     )
     WITH CHECK ( 
         authz.has_permission_in_organization(
             (SELECT organization_id FROM authz.roles WHERE id = role_permissions.role_id),
-            'edit-role'
+            'edit-role'::authz.permission
         )
      );
 
@@ -1115,7 +1133,7 @@ CREATE POLICY "Delete require `edit-role` in org"
     USING (
         authz.has_permission_in_organization(
             (SELECT organization_id FROM authz.roles WHERE id = role_permissions.role_id),
-            'edit-role'
+            'edit-role'::authz.permission
         )
     );
 
@@ -1141,7 +1159,7 @@ CREATE POLICY "Require `select-group` OR membership"
         authz.has_group_membership(groups.organization_id, groups.id) OR
         authz.has_permission_in_organization(
             groups.organization_id,
-            'select-group'
+            'select-group'::authz.permission
         )        
 );
 
@@ -1153,7 +1171,7 @@ CREATE POLICY "Require `add-group` in org"
     WITH CHECK (
         authz.has_permission_in_organization(
             groups.organization_id,
-            'add-group'
+            'add-group'::authz.permission
         )
     );
 
@@ -1165,7 +1183,7 @@ CREATE POLICY "Require `delete-group` in org"
     USING (
         authz.has_permission_in_organization(
             groups.organization_id,
-            'delete-member'
+            'delete-member'::authz.permission
     )
 );
 
@@ -1177,13 +1195,13 @@ CREATE POLICY "Require `edit-group` in org"
     USING (
         authz.has_permission_in_organization(
             groups.organization_id,
-            'edit-group'
+            'edit-group'::authz.permission
         )
     )
     WITH CHECK (
         authz.has_permission_in_organization(
             groups.organization_id,
-            'edit-group'
+            'edit-group'::authz.permission
         )
     )
 ;
@@ -1209,7 +1227,7 @@ CREATE POLICY "Require `select-group` OR membership"
         authz.has_group_membership(group_members.organization_id, group_members.group_id) OR 
         authz.has_permission_in_organization(
             group_members.organization_id,
-            'select-group'
+            'select-group'::authz.permission
     )
 );
 
@@ -1221,7 +1239,7 @@ CREATE POLICY "Require `edit-group` to add"
     WITH CHECK (
         authz.has_permission_in_organization(
             group_members.organization_id,
-            'edit-group'
+            'edit-group'::authz.permission
         )
     );
 
@@ -1233,7 +1251,7 @@ CREATE POLICY "Require `edit-group` to delete"
     USING (
         authz.has_permission_in_organization(
             group_members.organization_id,
-            'edit-group'
+            'edit-group'::authz.permission
         )
     );
 
@@ -1245,13 +1263,13 @@ CREATE POLICY "Require `edit-group` to update"
     USING (
         authz.has_permission_in_organization(
             group_members.organization_id,
-            'edit-group'
+            'edit-group'::authz.permission
         )
     )
     WITH CHECK (
         authz.has_permission_in_organization(
             group_members.organization_id,
-            'edit-group'
+            'edit-group'::authz.permission
         )
     )
 ;
@@ -1277,7 +1295,7 @@ CREATE POLICY "Require `select-group` / membership"
         authz.has_group_membership(group_roles.organization_id, group_roles.group_id) OR
         authz.has_permission_in_organization(
             group_roles.organization_id,
-            'select-group'
+            'select-group'::authz.permission
     )
 );
 
@@ -1289,7 +1307,7 @@ CREATE POLICY "Require `edit-group` to add"
     WITH CHECK (
         authz.has_permission_in_organization(
             group_roles.organization_id,
-            'edit-group'
+            'edit-group'::authz.permission
         ) AND
         authz.role_available_in_organization(
             group_roles.organization_id,
@@ -1305,7 +1323,7 @@ CREATE POLICY "Require `edit-group` to delete"
     USING (
         authz.has_permission_in_organization(
             (SELECT organization_id FROM authz.groups g WHERE g.id = group_roles.group_id),
-            'edit-group'
+            'edit-group'::authz.permission
         ) AND
         authz.role_available_in_organization(
             group_roles.organization_id,
@@ -1321,7 +1339,7 @@ CREATE POLICY "Require `edit-group` to update"
     USING (
         authz.has_permission_in_organization(
             group_roles.organization_id,
-            'edit-group'
+            'edit-group'::authz.permission
         ) AND
         authz.role_available_in_organization(
             group_roles.organization_id,
@@ -1331,7 +1349,7 @@ CREATE POLICY "Require `edit-group` to update"
     WITH CHECK (
         authz.has_permission_in_organization(
             group_roles.organization_id,
-            'edit-group'
+            'edit-group'::authz.permission
         ) AND
         authz.role_available_in_organization(
             group_roles.organization_id,
@@ -1358,19 +1376,19 @@ INSERT INTO authz.roles (name, slug, description) VALUES
 SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Delete organization',
-    'delete-organization',
+    'delete-organization'::authz.permission,
     'Delete the organization'
 );
 SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Edit organization',
-    'edit-organization',
+    'edit-organization'::authz.permission,
     'Edit the organization'
 );
 SELECT authz.insert_role_permission(
     ARRAY['owner', 'editor', 'read-only'],
     'Select organization',
-    'select-organization',
+    'select-organization'::authz.permission,
     'View the organization'
 );
 
@@ -1378,25 +1396,25 @@ SELECT authz.insert_role_permission(
 SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Remove member',
-    'delete-member',
+    'delete-member'::authz.permission,
     'Remove a member from the organization'
 );
 SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Add member',
-    'add-member',
+    'add-member'::authz.permission,
     'Add a member to the organization'
 );
 SELECT authz.insert_role_permission(
     ARRAY['owner', 'editor', 'read-only'],
     'Edit member',
-    'edit-member',
+    'edit-member'::authz.permission,
     'Update a member in the organization'
 );
 SELECT authz.insert_role_permission(
     ARRAY['owner', 'editor', 'read-only'],
     'Select member',
-    'select-member',
+    'select-member'::authz.permission,
     'Select members in the organization'
 );
 
@@ -1404,25 +1422,25 @@ SELECT authz.insert_role_permission(
 SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Remove role',
-    'delete-role',
+    'delete-role'::authz.permission,
     'Remove a role'
 );
 SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Add role',
-    'add-role',
+    'add-role'::authz.permission,
     'Add a role to the organization'
 );
 SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Edit role',
-    'edit-role',
+    'edit-role'::authz.permission,
     'Update a role in the organization'
 );
 SELECT authz.insert_role_permission(
     ARRAY['owner', 'editor', 'read-only'],
     'Select role',
-    'select-role',
+    'select-role'::authz.permission,
     'Select roles'
 );
 
@@ -1430,24 +1448,24 @@ SELECT authz.insert_role_permission(
 SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Remove group',
-    'delete-group',
+    'delete-group'::authz.permission,
     'Remove a group'
 );
 SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Add group',
-    'add-group',
+    'add-group'::authz.permission,
     'Add a group to the organization'
 );
 SELECT authz.insert_role_permission(
     ARRAY['owner'],
     'Edit group',
-    'edit-group',
+    'edit-group'::authz.permission,
     'Update a group in the organization'
 );
 SELECT authz.insert_role_permission(
     ARRAY['owner', 'editor', 'read-only'],
     'Select group',
-    'select-group',
+    'select-group'::authz.permission,
     'Select group'
 );
