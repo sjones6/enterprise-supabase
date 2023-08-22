@@ -499,11 +499,25 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
+      add_member_to_group: {
+        Args: {
+          organization_id: string
+          group_id: string
+          user_id: string
+        }
+        Returns: {
+          created_at: string | null
+          group_id: string
+          organization_id: string
+          updated_at: string | null
+          user_id: string
+        }
+      }
       add_member_to_organization: {
         Args: {
           organization_id: string
           user_id: string
-          role_id: string
+          role_id?: string
         }
         Returns: {
           created_at: string | null
@@ -535,6 +549,17 @@ export interface Database {
           remove_roles?: string[]
         }
         Returns: boolean
+      }
+      get_members_for_roles: {
+        Args: {
+          role_ids: string[]
+        }
+        Returns: {
+          created_at: string | null
+          organization_id: string
+          updated_at: string | null
+          user_id: string
+        }[]
       }
       get_permission_slugs_in_organization: {
         Args: {

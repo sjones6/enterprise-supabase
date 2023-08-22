@@ -1,5 +1,4 @@
 BEGIN;
-CREATE EXTENSION "basejump-supabase_test_helpers";
 
 select plan(5);
 

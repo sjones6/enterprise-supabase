@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS authz.members
     user_id uuid NOT NULL REFERENCES auth.users (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
+    is_primary boolean NOT NULL DEFAULT FALSE,
     updated_at timestamp with time zone,
     created_at timestamp with time zone,
     PRIMARY KEY (organization_id, user_id)
@@ -409,7 +410,7 @@ CREATE OR REPLACE FUNCTION authz.get_permissions_in_organization(organization_id
                 LEFT JOIN groups g on gr.organization_id = g.organization_id AND g.id = gr.group_id
                 LEFT JOIN group_members gm ON gm.organization_id = g.organization_id AND gm.group_id = g.id
                 LEFT JOIN members m ON  m.organization_id = gm.organization_id AND m.user_id = gm.user_id
-                    WHERE g.organization_id = $1 AND m.user_id = $2 
+                    WHERE m.organization_id = $1 AND m.user_id = $2 
         );
     $BODY$;
 
@@ -623,23 +624,44 @@ CREATE OR REPLACE FUNCTION authz.update_users_permissions(user_id uuid, organiza
     SET search_path=authz
 AS $BODY$
     DECLARE
+        is_org_active boolean;
         permissions authz.permission[];
         permission authz.permission;
     BEGIN
         permissions := ARRAY(SELECT slug FROM authz.get_permissions_in_organization(organization_id, user_id));
+        -- RAISE NOTICE 'Updating user %', user_id;
+        -- RAISE NOTICE 'User has permissions in org %', array_length(permissions, 1);
         IF permissions IS NOT NULL
         THEN
             DELETE FROM authz.user_permissions up
                 WHERE up.organization_id = $2
                     AND up.user_id = $1
                     AND up.permission != ANY (permissions);
+            
             FOREACH permission in ARRAY permissions
             LOOP
                 INSERT INTO authz.user_permissions (organization_id, user_id, permission)
                     VALUES (
                         $2, $1, permission
-                    );
+                    ) ON CONFLICT DO NOTHING;
             END LOOP;
+
+
+            SELECT is_primary INTO is_org_active FROM authz.members m
+                WHERE m.organization_id = $2 AND m.user_id = $1;
+            
+            IF is_org_active = true
+            THEN   
+                -- RAISE NOTICE 'User has active org %', is_org_active;
+                UPDATE auth.users u SET raw_app_meta_data = 
+                        coalesce(raw_app_meta_data::jsonb, '{}'::jsonb) ||
+                        json_build_object('organization', organization_id)::jsonb ||
+                        json_build_object('organization_permissions', ARRAY(
+                            SELECT up.permission FROM authz.user_permissions up
+                                WHERE up.organization_id = $2 AND up.user_id = $1
+                        ))::jsonb
+                    WHERE u.id = $1;
+            END IF;
         END IF;
     END;
 $BODY$;
@@ -717,13 +739,6 @@ BEGIN
                 permission_id
             );
     END LOOP;
-
-    -- Add all permissions to the 'super-admin'
-    INSERT INTO authz.role_permissions (role_id, permission_id) 
-        VALUES (
-            (SELECT id FROM authz.roles r WHERE r.slug = 'super-admin'),
-            permission_id
-        );
 END;
 $$
 LANGUAGE plpgsql;
@@ -779,7 +794,7 @@ GRANT EXECUTE ON FUNCTION authz.create_organization(name text) TO authenticated;
 -- 
 -- Add member to organization with role
 -- 
-CREATE OR REPLACE FUNCTION authz.add_member_to_organization(organization_id uuid, user_id uuid, role_id uuid)
+CREATE OR REPLACE FUNCTION authz.add_member_to_organization(organization_id uuid, user_id uuid, role_id uuid = NULL)
   RETURNS authz.members
   LANGUAGE 'plpgsql'
   SECURITY INVOKER 
@@ -793,13 +808,16 @@ CREATE OR REPLACE FUNCTION authz.add_member_to_organization(organization_id uuid
     INSERT INTO authz.members(organization_id, user_id)
       VALUES($1, $2);
 
-    -- set the role
-    INSERT INTO authz.member_roles(organization_id, user_id, role_id)
-      VALUES(
-        $1,
-        $2,
-        $3
-      );
+    IF $3 IS NOT NULL
+    THEN
+        -- set the role
+        INSERT INTO authz.member_roles(organization_id, user_id, role_id)
+        VALUES(
+            $1,
+            $2,
+            $3
+        );
+    END IF;
 
     SELECT * FROM authz.members m
         INTO member
@@ -819,7 +837,7 @@ GRANT EXECUTE ON FUNCTION authz.add_member_to_organization(organization_id uuid,
 -- 
 -- Add member to group
 -- 
-CREATE OR REPLACE FUNCTION authz.add_member_to_group(organization_id uuid, group_id, user_id uuid)
+CREATE OR REPLACE FUNCTION authz.add_member_to_group(organization_id uuid, group_id uuid, user_id uuid)
   RETURNS authz.group_members
   LANGUAGE 'plpgsql'
   SECURITY INVOKER 
@@ -832,7 +850,7 @@ CREATE OR REPLACE FUNCTION authz.add_member_to_group(organization_id uuid, group
 
     SELECT EXISTS(
         SELECT 1 FROM authz.members m WHERE m.organization_id = $1 AND m.user_id = $3
-    ) in member_exists_in_org;
+    ) INTO member_exists_in_org;
 
     IF member_exists_in_org != true
     THEN
@@ -852,11 +870,11 @@ CREATE OR REPLACE FUNCTION authz.add_member_to_group(organization_id uuid, group
   END;
 $BODY$;
 
-ALTER FUNCTION authz.add_member_to_group(organization_id uuid, group_id, user_id uuid)
+ALTER FUNCTION authz.add_member_to_group(organization_id uuid, group_id uuid, user_id uuid)
     OWNER TO CURRENT_ROLE;
 
-REVOKE ALL ON FUNCTION authz.add_member_to_group(organization_id uuid, group_id, user_id uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION authz.add_member_to_group(organization_id uuid, group_id, user_id uuid) TO authenticated;
+REVOKE ALL ON FUNCTION authz.add_member_to_group(organization_id uuid, group_id uuid, user_id uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION authz.add_member_to_group(organization_id uuid, group_id uuid, user_id uuid) TO authenticated;
 
 -- 
 -- Set the user's active organization
@@ -865,20 +883,38 @@ CREATE OR REPLACE FUNCTION authz.set_active_organization(active_organization_id 
     RETURNS "text"
     LANGUAGE "plpgsql"
     SECURITY DEFINER 
+    PARALLEL UNSAFE
     SET search_path=authz
     AS $$
     DECLARE
         is_member boolean;
+        meta json;
     BEGIN
 
         SElECT EXISTS(
             SELECT 1 FROM members m
-                WHERE m.user_id = auth.uid() AND m.organization_id = active_organization_id
+                WHERE m.organization_id = active_organization_id AND m.user_id = auth.uid()
         ) INTO is_member;
+        -- RAISE NOTICE '%', concat('user id ', auth.uid(), ', active_organization_id ', active_organization_id);
+        -- RAISE NOTICE 'Is member %', is_member;
         IF is_member = TRUE THEN
             UPDATE auth.users SET raw_app_meta_data = 
-            raw_app_meta_data || 
-                json_build_object('organization', active_organization_id)::jsonb where id = auth.uid();
+                coalesce(raw_app_meta_data::jsonb, '{}'::jsonb) ||
+                json_build_object(
+                    'organization', active_organization_id,
+                    'organization_permissions', ARRAY(
+                        SELECT permission FROM authz.user_permissions up
+                            WHERE up.organization_id = active_organization_id AND up.user_id = auth.uid()
+                    ))::jsonb
+                WHERE id = auth.uid();
+            SELECT raw_app_meta_data INTO meta FROM auth.users WHERE id = auth.uid();
+            -- RAISE NOTICE '%', meta;
+            UPDATE authz.members m SET
+                is_primary = FALSE
+                WHERE m.organization_id != active_organization_id AND m.user_id = auth.uid();
+            UPDATE authz.members m SET
+                is_primary = TRUE
+                WHERE m.organization_id = active_organization_id AND m.user_id = auth.uid();
             RETURN 'OK';
         END IF;
         
@@ -913,75 +949,66 @@ CREATE OR REPLACE FUNCTION authz.edit_group(
   AS $BODY$
   DECLARE
      group_exists boolean;
-     existing_members uuid[];
-     existing_roles uuid[];
-     role_id uuid;
-     member_id uuid;
+     new_role_id uuid;
+     new_member_id uuid;
   BEGIN
 
     -- check for existence
-    SELECT exists(SELECT 1 FROM authz.groups g WHERE g.id = group_id AND g.organization_id = organization_id) INTO group_exists;
+    SELECT EXISTS(SELECT 1 FROM authz.groups g WHERE g.organization_id = $2 AND g.id = $1) INTO group_exists;
     IF group_exists = false THEN
+        RAISE NOTICE 'Group % does not exist in organization', group_id
+            USING HINT = 'Please group exists in organization.';
         return false;
     END IF;
 
     -- update name
     IF name IS NOT NULL THEN
-      UPDATE authz.groups g SET g.name = name
-        WHERE g.organization_id = organization_id AND g.id = group_id;
+      UPDATE authz.groups g SET name = $3
+        WHERE g.organization_id = $2 AND g.id = $1;
     END IF;
 
     -- update description
     IF description IS NOT NULL THEN
-        UPDATE authz.groups g SET g.description = description
-            WHERE g.organization_id = organization_id AND g.id = group_id;
+        UPDATE authz.groups g SET description = $4
+            WHERE g.organization_id = $2 AND g.id = $1;
+    END IF;
+
+        -- remove roles
+    IF array_length(remove_roles, 1) > 0 THEN
+        DELETE FROM authz.group_roles gr
+            WHERE g.organization_id = $2 AND g.id = $1 AND gr.role_id = ANY (remove_roles);
+    END IF;
+
+    -- add roles
+    IF array_length(add_roles, 1) > 0 THEN
+        FOREACH new_role_id IN ARRAY add_roles
+        LOOP
+            INSERT INTO authz.group_roles (organization_id, group_id, role_id) 
+                VALUES (
+                    $2,
+                    $1,
+                    new_role_id
+                ) ON CONFLICT DO NOTHING;
+        END LOOP; 
     END IF;
 
     -- remove members
     IF array_length(remove_members, 1) > 0 THEN
         DELETE FROM authz.group_members gm
-            WHERE gm.organization_id = organization_id AND gm.user_id IN (remove_members);
+            WHERE gm.organization_id = $2 AND gm.group_id = $1 AND gm.user_id = ANY (remove_members);
     END IF;
 
     -- add members
     IF array_length(add_members, 1) > 0 THEN
-        SELECT member_id FROM authz.group_members gm
-            INTO existing_members
-            WHERE gm.organization_id = organization_id AND gm.group_id = group_id AND gm.member_id IN (add_members);
-        FOREACH member_id IN ARRAY add_members
+        FOREACH new_member_id IN ARRAY add_members
         LOOP
-            IF ARRAY[member_id] <@ exiting_members THEN
-                INSERT INTO authz.group_members (organization_id, group_id, member_id) 
-                    VALUES (
-                        organization_id,
-                        group_id,
-                        auth.uid()
-                    );
-            END IF;
-        END LOOP; 
-    END IF;
-
-    -- remove roles
-    IF array_length(remove_roles, 1) > 0 THEN
-        DELETE FROM authz.group_roles gr
-            WHERE gr.role_id IN (remove_roles);
-    END IF;
-
-    -- add members
-    IF array_length(add_roles, 1) > 0 THEN
-        SELECT role_id FROM authz.group_roles gr
-            INTO existing_roles
-            WHERE gr.organization_id = organization_id AND gr.group_id = group_id AND gm.role_id IN (add_roles);
-        FOREACH role_id IN ARRAY add_roles
-        LOOP
-            IF ARRAY[role_id] <@ exiting_roles THEN
-                INSERT INTO authz.group_roles (organization_id, group_id, role_id) 
-                    VALUES (
-                        organization_id,
-                        group_id,
-                        role_id
-                    );
-            END IF;
+            INSERT INTO authz.group_members (organization_id, group_id, user_id) 
+                VALUES (
+                    $2,
+                    $1,
+                    new_member_id
+                )
+                ON CONFLICT DO NOTHING;
         END LOOP; 
     END IF;
 
@@ -1023,20 +1050,32 @@ GRANT EXECUTE ON FUNCTION authz.edit_group(
 ) TO authenticated;
 
 -- 
--- Triggers
---  
--- Functions:
--- get_members_for_group
--- get_members_for_role
--- get_groups_for_role
+-- Get members for a list of roles
 -- 
--- triggers:
--- - role_permissions -> update all groups and members with role
--- - group_roles -> update all group members
--- - DONE group_members -> update user
--- - DONE organization_members -> update user
 
+CREATE OR REPLACE FUNCTION authz.get_members_for_roles(role_ids uuid[])
+    RETURNS SETOF authz.members
+    LANGUAGE 'sql'
+    SECURITY DEFINER
+AS $BODY$
+    SELECT m.* FROM authz.members m
+            LEFT JOIN authz.member_roles mr ON m.organization_id = mr.organization_id AND m.user_id = mr.user_id
+            WHERE mr.role_id = ANY ($1)
+            UNION
+        SELECT m.* FROM authz.members m
+            LEFT JOIN authz.group_members gm ON m.organization_id = gm.organization_id AND m.user_id = gm.user_id
+            LEFT JOIN authz.group_roles gr ON m.organization_id = gr.organization_id AND gm.group_id = gr.group_id
+            WHERE gr.role_id = ANY ($1);
+$BODY$;
 
+ALTER FUNCTION authz.get_members_for_roles(role_ids uuid[])
+    OWNER TO CURRENT_ROLE;
+
+GRANT EXECUTE ON FUNCTION authz.get_members_for_roles(role_ids uuid[]) TO authenticated;
+
+-- 
+-- Triggers
+--
 CREATE OR REPLACE FUNCTION authz.update_organization_or_group_members_on_insert()
     RETURNS trigger
     LANGUAGE 'plpgsql'
@@ -1044,6 +1083,7 @@ CREATE OR REPLACE FUNCTION authz.update_organization_or_group_members_on_insert(
     VOLATILE
 AS $BODY$
     BEGIN
+        -- RAISE NOTICE 'Update for %', TG_ARGV[0];
         PERFORM authz.update_users_permissions(NEW.user_id, NEW.organization_id);
         RETURN NEW;
     END;
@@ -1072,6 +1112,24 @@ ALTER FUNCTION authz.update_organization_or_group_members_on_update()
 
 GRANT EXECUTE ON FUNCTION authz.update_organization_or_group_members_on_update() TO authenticated;
 
+CREATE OR REPLACE FUNCTION authz.update_organization_or_group_members_on_delete()
+    RETURNS trigger
+    LANGUAGE 'plpgsql'
+    COST 100
+    VOLATILE
+AS $BODY$
+    BEGIN
+        -- RAISE NOTICE 'Updating users for membership delete %', NEW.user_id;
+        PERFORM authz.update_users_permissions(OLD.user_id, OLD.organization_id);
+        RETURN NEW;
+    END;
+$BODY$;
+
+ALTER FUNCTION authz.update_organization_or_group_members_on_delete()
+    OWNER TO postgres;
+
+GRANT EXECUTE ON FUNCTION authz.update_organization_or_group_members_on_delete() TO authenticated;
+
 -- Trigger for group members
 -- Re-use the triggers for org members
 
@@ -1079,28 +1137,39 @@ CREATE TRIGGER authz_organization_member_roles_insert_permissions
     AFTER INSERT 
     ON authz.member_roles
     FOR EACH ROW
-    EXECUTE FUNCTION authz.update_organization_or_group_members_on_insert();
+    EXECUTE FUNCTION authz.update_organization_or_group_members_on_insert('org');
 
 CREATE TRIGGER authz_group_members_insert_permissions
     AFTER INSERT 
     ON authz.group_members
     FOR EACH ROW
-    EXECUTE FUNCTION authz.update_organization_or_group_members_on_insert();
+    EXECUTE FUNCTION authz.update_organization_or_group_members_on_insert('group');
 
 CREATE TRIGGER authz_organization_member_roles_update_permissions
     AFTER UPDATE 
     ON authz.member_roles
     FOR EACH ROW
     WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id OR OLD.organization_id IS DISTINCT FROM NEW.organization_id)
-    EXECUTE FUNCTION authz.update_organization_or_group_members_on_update();
+    EXECUTE FUNCTION authz.update_organization_or_group_members_on_update('org');
 
 CREATE TRIGGER authz_group_members_update_permissions
     AFTER UPDATE 
     ON authz.group_members
     FOR EACH ROW
     WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id OR OLD.organization_id IS DISTINCT FROM NEW.organization_id)
-    EXECUTE FUNCTION authz.update_organization_or_group_members_on_update();
+    EXECUTE FUNCTION authz.update_organization_or_group_members_on_update('group');
 
+CREATE TRIGGER authz_members_update_permissions_on_delete
+    AFTER DELETE 
+    ON authz.members
+    FOR EACH ROW
+    EXECUTE FUNCTION authz.update_organization_or_group_members_on_delete('org');
+
+CREATE TRIGGER authz_group_members_update_permissions_on_delete
+    AFTER DELETE 
+    ON authz.group_members
+    FOR EACH ROW
+    EXECUTE FUNCTION authz.update_organization_or_group_members_on_delete('group');
 
 CREATE OR REPLACE FUNCTION authz.update_group_members_on_group_role_insert()
     RETURNS trigger
@@ -1117,6 +1186,7 @@ AS $BODY$
             WHERE gm.organization_id = NEW.organization_id AND gm.group_id = NEW.group_id;
         IF user_ids IS NOT NULL
         THEN
+            -- RAISE NOTICE 'Updating users for group role change %', array_length(user_ids);
             FOREACH user_id IN ARRAY (user_ids)
             LOOP
               PERFORM authz.update_users_permissions(user_id, NEW.organization_id);
@@ -1130,6 +1200,13 @@ ALTER FUNCTION authz.update_group_members_on_group_role_insert()
     OWNER TO postgres;
 
 GRANT EXECUTE ON FUNCTION authz.update_group_members_on_group_role_insert() TO authenticated;
+
+CREATE TRIGGER authz_group_members_on_insert_group_roles
+    AFTER INSERT 
+    ON authz.group_roles
+    FOR EACH ROW
+    EXECUTE FUNCTION authz.update_group_members_on_group_role_insert();
+
 
 CREATE OR REPLACE FUNCTION authz.update_group_members_on_group_role_delete()
     RETURNS trigger
@@ -1177,14 +1254,12 @@ AS $BODY$
         group_members authz.group_members[];
         group_member authz.group_members;
     BEGIN
-        SELECT * INTO group_members
-         FROM (
-            SELECT * FROM authz.group_members gm
+        SELECT * FROM authz.group_members gm
+            INTO group_members
                 WHERE gm.organization_id = OLD.organization_id AND gm.group_id = OLD.group_id
                 UNION
             SELECT * FROM authz.group_members gm
-                WHERE gm.organization_id = NEW.organization_id AND gm.group_id = NEW.group_id
-         );
+                WHERE gm.organization_id = NEW.organization_id AND gm.group_id = NEW.group_id;
         
         IF group_members IS NOT NULL
         THEN
@@ -1202,13 +1277,118 @@ ALTER FUNCTION authz.update_group_members_on_group_role_update()
 
 GRANT EXECUTE ON FUNCTION authz.update_group_members_on_group_role_update() TO authenticated;
 
-CREATE TRIGGER authz_group_members_on_remove_group_roles
+CREATE TRIGGER authz_group_members_on_update_group_roles
     AFTER UPDATE 
     ON authz.group_roles
     FOR EACH ROW
     WHEN (OLD.role_id IS DISTINCT FROM NEW.role_id OR OLD.organization_id IS DISTINCT FROM NEW.organization_id)
     EXECUTE FUNCTION authz.update_group_members_on_group_role_update();
 
+
+-- 
+-- Triggers for changes in a *role* record specifically
+-- 
+CREATE OR REPLACE FUNCTION authz.update_users_for_role()
+    RETURNS trigger
+    LANGUAGE 'plpgsql'
+    SECURITY DEFINER
+    COST 100
+    VOLATILE
+AS $BODY$
+    DECLARE
+        members authz.members[];
+        member authz.members;
+    BEGIN
+        SELECT * FROM authz.get_members_for_roles(
+            ARRAY(SELECT id FROM trigger_role_permissions)
+        ) INTO members;
+        IF members IS NOT NULL
+        THEN
+            FOREACH member IN ARRAY (members)
+            LOOP
+              PERFORM authz.update_users_permissions(member.user_id, member.organization_id);
+            END LOOP;
+        END IF;
+        RETURN NEW;
+    END;
+$BODY$;
+
+ALTER FUNCTION authz.update_users_for_role()
+    OWNER TO postgres;
+
+GRANT EXECUTE ON FUNCTION authz.update_users_for_role() TO authenticated;
+
+CREATE TRIGGER authz_update_members_on_role_permssions_delete
+    AFTER DELETE 
+    ON authz.roles
+    REFERENCING OLD TABLE AS trigger_role_permissions
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION authz.update_users_for_role();
+
+-- 
+-- Triggers for changes in role permissions
+-- 
+CREATE OR REPLACE FUNCTION authz.update_users_for_role_permissions()
+    RETURNS trigger
+    LANGUAGE 'plpgsql'
+    SECURITY DEFINER
+    COST 100
+    VOLATILE
+AS $BODY$
+    DECLARE
+        members authz.members[];
+        member authz.members;
+    BEGIN
+        SELECT * FROM authz.get_members_for_roles(
+            ARRAY(SELECT role_id FROM trigger_role_permissions)
+        ) INTO members;
+        IF members IS NOT NULL
+        THEN
+            FOREACH member IN ARRAY (members)
+            LOOP
+              PERFORM authz.update_users_permissions(member.user_id, member.organization_id);
+            END LOOP;
+        END IF;
+        RETURN NEW;
+    END;
+$BODY$;
+
+ALTER FUNCTION authz.update_users_for_role_permissions()
+    OWNER TO postgres;
+
+GRANT EXECUTE ON FUNCTION authz.update_users_for_role_permissions() TO authenticated;
+
+-- 
+-- There are two triggers attached to `UPDATE` - one to handle
+-- the "NEW" table and one to handle the "OLD" table.
+-- 
+CREATE TRIGGER authz_update_members_on_role_permssions_update_new
+    AFTER UPDATE 
+    ON authz.role_permissions
+    REFERENCING NEW TABLE AS trigger_role_permissions
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION authz.update_users_for_role_permissions();
+
+CREATE TRIGGER authz_update_members_on_role_permssions_update_old
+    AFTER UPDATE 
+    ON authz.role_permissions
+    REFERENCING OLD TABLE AS trigger_role_permissions
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION authz.update_users_for_role_permissions();
+
+CREATE TRIGGER authz_update_members_on_role_permssions_insert
+    AFTER INSERT 
+    ON authz.role_permissions
+    REFERENCING NEW TABLE AS trigger_role_permissions
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION authz.update_users_for_role_permissions();
+
+CREATE TRIGGER authz_update_members_on_role_permssions_delete
+    AFTER DELETE 
+    ON authz.role_permissions
+    REFERENCING OLD TABLE AS trigger_role_permissions
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION authz.update_users_for_role_permissions();
 
 -- 
 -- RLS
@@ -2096,9 +2276,8 @@ CREATE POLICY "Only CURRENT_ROLE can update"
 -- Create Default Roles 
 -- 
 INSERT INTO authz.roles (name, slug, description) VALUES
-    ('Super Admin', 'super-admin', 'Admin rights over all organizations'),
     ('Owner', 'owner', 'Full ownership rights in the organization'),
-    ('Editor' , 'editor', 'Edit records in the organization'),
+    ('Admin' , 'admin', 'Admin rights in the organization, but cannot delete the organization.'),
     ('Read-only', 'read-only', 'Read-only rights to the organization');
 
 -- 
@@ -2113,13 +2292,13 @@ SELECT authz.insert_role_permission(
     'Delete the organization'
 );
 SELECT authz.insert_role_permission(
-    ARRAY['owner'],
+    ARRAY['owner', 'admin'],
     'Edit organization',
     'edit-organization'::authz.permission,
     'Edit the organization'
 );
 SELECT authz.insert_role_permission(
-    ARRAY['owner', 'editor', 'read-only'],
+    ARRAY['owner', 'admin', 'read-only'],
     'Select organization',
     'select-organization'::authz.permission,
     'View the organization'
@@ -2127,25 +2306,25 @@ SELECT authz.insert_role_permission(
 
 -- Members
 SELECT authz.insert_role_permission(
-    ARRAY['owner'],
+    ARRAY['owner', 'admin'],
     'Remove member',
     'delete-member'::authz.permission,
     'Remove a member from the organization'
 );
 SELECT authz.insert_role_permission(
-    ARRAY['owner'],
+    ARRAY['owner', 'admin'],
     'Add member',
     'add-member'::authz.permission,
     'Add a member to the organization'
 );
 SELECT authz.insert_role_permission(
-    ARRAY['owner', 'editor'],
+    ARRAY['owner', 'admin'],
     'Edit member',
     'edit-member'::authz.permission,
     'Update a member in the organization'
 );
 SELECT authz.insert_role_permission(
-    ARRAY['owner', 'editor', 'read-only'],
+    ARRAY['owner', 'admin', 'read-only'],
     'Select member',
     'select-member'::authz.permission,
     'Select members in the organization'
@@ -2153,25 +2332,25 @@ SELECT authz.insert_role_permission(
 
 -- Roles
 SELECT authz.insert_role_permission(
-    ARRAY['owner'],
+    ARRAY['owner', 'admin'],
     'Remove role',
     'delete-role'::authz.permission,
     'Remove a role'
 );
 SELECT authz.insert_role_permission(
-    ARRAY['owner'],
+    ARRAY['owner', 'admin'],
     'Add role',
     'add-role'::authz.permission,
     'Add a role to the organization'
 );
 SELECT authz.insert_role_permission(
-    ARRAY['owner'],
+    ARRAY['owner', 'admin'],
     'Edit role',
     'edit-role'::authz.permission,
     'Update a role in the organization'
 );
 SELECT authz.insert_role_permission(
-    ARRAY['owner', 'editor', 'read-only'],
+    ARRAY['owner', 'admin', 'read-only'],
     'Select role',
     'select-role'::authz.permission,
     'Select roles'
@@ -2179,25 +2358,25 @@ SELECT authz.insert_role_permission(
 
 -- Groups
 SELECT authz.insert_role_permission(
-    ARRAY['owner'],
+    ARRAY['owner', 'admin'],
     'Remove group',
     'delete-group'::authz.permission,
     'Remove a group'
 );
 SELECT authz.insert_role_permission(
-    ARRAY['owner'],
+    ARRAY['owner', 'admin'],
     'Add group',
     'add-group'::authz.permission,
     'Add a group to the organization'
 );
 SELECT authz.insert_role_permission(
-    ARRAY['owner'],
+    ARRAY['owner', 'admin'],
     'Edit group',
     'edit-group'::authz.permission,
     'Update a group in the organization'
 );
 SELECT authz.insert_role_permission(
-    ARRAY['owner', 'editor', 'read-only'],
+    ARRAY['owner', 'admin', 'read-only'],
     'Select group',
     'select-group'::authz.permission,
     'Select group'
