@@ -135,6 +135,123 @@ export interface Database {
           }
         ];
       };
+      member_invitation_groups: {
+        Row: {
+          created_at: string | null;
+          email: string;
+          group_id: string;
+          organization_id: string;
+          updated_at: string | null;
+        };
+        Insert: {
+          created_at?: string | null;
+          email: string;
+          group_id: string;
+          organization_id: string;
+          updated_at?: string | null;
+        };
+        Update: {
+          created_at?: string | null;
+          email?: string;
+          group_id?: string;
+          organization_id?: string;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "member_invitation_groups_organization_id_email_fkey";
+            columns: ["organization_id", "email"];
+            referencedRelation: "member_invitations";
+            referencedColumns: ["organization_id", "email"];
+          },
+          {
+            foreignKeyName: "member_invitation_groups_organization_id_fkey";
+            columns: ["organization_id"];
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "member_invitation_groups_organization_id_group_id_fkey";
+            columns: ["organization_id", "group_id"];
+            referencedRelation: "groups";
+            referencedColumns: ["organization_id", "id"];
+          }
+        ];
+      };
+      member_invitation_roles: {
+        Row: {
+          created_at: string | null;
+          email: string;
+          organization_id: string;
+          role_id: string;
+          updated_at: string | null;
+        };
+        Insert: {
+          created_at?: string | null;
+          email: string;
+          organization_id: string;
+          role_id: string;
+          updated_at?: string | null;
+        };
+        Update: {
+          created_at?: string | null;
+          email?: string;
+          organization_id?: string;
+          role_id?: string;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "member_invitation_roles_organization_id_email_fkey";
+            columns: ["organization_id", "email"];
+            referencedRelation: "member_invitations";
+            referencedColumns: ["organization_id", "email"];
+          },
+          {
+            foreignKeyName: "member_invitation_roles_organization_id_fkey";
+            columns: ["organization_id"];
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "member_invitation_roles_role_id_fkey";
+            columns: ["role_id"];
+            referencedRelation: "roles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      member_invitations: {
+        Row: {
+          created_at: string | null;
+          email: string;
+          expires_at: string | null;
+          organization_id: string;
+          updated_at: string | null;
+        };
+        Insert: {
+          created_at?: string | null;
+          email: string;
+          expires_at?: string | null;
+          organization_id: string;
+          updated_at?: string | null;
+        };
+        Update: {
+          created_at?: string | null;
+          email?: string;
+          expires_at?: string | null;
+          organization_id?: string;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "member_invitations_organization_id_fkey";
+            columns: ["organization_id"];
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       member_roles: {
         Row: {
           created_at: string | null;
@@ -188,18 +305,21 @@ export interface Database {
         Row: {
           created_at: string | null;
           organization_id: string;
+          permissions_last_updated_at: string | null;
           updated_at: string | null;
           user_id: string;
         };
         Insert: {
           created_at?: string | null;
           organization_id: string;
+          permissions_last_updated_at?: string | null;
           updated_at?: string | null;
           user_id: string;
         };
         Update: {
           created_at?: string | null;
           organization_id?: string;
+          permissions_last_updated_at?: string | null;
           updated_at?: string | null;
           user_id?: string;
         };
@@ -340,11 +460,76 @@ export interface Database {
           }
         ];
       };
+      user_permissions: {
+        Row: {
+          created_at: string | null;
+          organization_id: string;
+          permission: Database["authz"]["Enums"]["permission"];
+          updated_at: string | null;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string | null;
+          organization_id: string;
+          permission: Database["authz"]["Enums"]["permission"];
+          updated_at?: string | null;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string | null;
+          organization_id?: string;
+          permission?: Database["authz"]["Enums"]["permission"];
+          updated_at?: string | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "user_permissions_organization_id_fkey";
+            columns: ["organization_id"];
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "user_permissions_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
+      add_member_to_group: {
+        Args: {
+          organization_id: string;
+          group_id: string;
+          user_id: string;
+        };
+        Returns: {
+          created_at: string | null;
+          group_id: string;
+          organization_id: string;
+          updated_at: string | null;
+          user_id: string;
+        };
+      };
+      add_member_to_organization: {
+        Args: {
+          organization_id: string;
+          user_id: string;
+          role_id?: string;
+        };
+        Returns: {
+          created_at: string | null;
+          organization_id: string;
+          permissions_last_updated_at: string | null;
+          updated_at: string | null;
+          user_id: string;
+        };
+      };
       create_organization: {
         Args: {
           name: string;
@@ -369,32 +554,61 @@ export interface Database {
         };
         Returns: boolean;
       };
+      get_members_for_roles: {
+        Args: {
+          role_ids: string[];
+        };
+        Returns: {
+          created_at: string | null;
+          organization_id: string;
+          permissions_last_updated_at: string | null;
+          updated_at: string | null;
+          user_id: string;
+        }[];
+      };
       get_permission_slugs_in_organization: {
         Args: {
           organization_id: string;
         };
         Returns: Database["authz"]["Enums"]["permission"][];
       };
-      get_permissions_in_organization: {
-        Args: {
-          organization_id: string;
-        };
-        Returns: Database["authz"]["CompositeTypes"]["permissions_row"][];
-      };
+      get_permissions_in_organization:
+        | {
+            Args: {
+              organization_id: string;
+              user_id: string;
+            };
+            Returns: Database["authz"]["CompositeTypes"]["permissions_row"][];
+          }
+        | {
+            Args: {
+              organization_id: string;
+            };
+            Returns: Database["authz"]["CompositeTypes"]["permissions_row"][];
+          };
       has_all_permissions_in_organization: {
         Args: {
           organization_id: string;
-          permission: Database["authz"]["Enums"]["permission"][];
+          permissions: Database["authz"]["Enums"]["permission"][];
         };
         Returns: boolean;
       };
-      has_any_permission_in_organization: {
-        Args: {
-          organization_id: string;
-          permission: Database["authz"]["Enums"]["permission"][];
-        };
-        Returns: boolean;
-      };
+      has_any_permission_in_organization:
+        | {
+            Args: {
+              organization_id: string;
+              permissions: Database["authz"]["Enums"]["permission"][];
+            };
+            Returns: boolean;
+          }
+        | {
+            Args: {
+              organization_id: string;
+              permissions: Database["authz"]["Enums"]["permission"][];
+              strategy: Database["authz"]["Enums"]["strategy"];
+            };
+            Returns: boolean;
+          };
       has_group_membership: {
         Args: {
           organization_id: string;
@@ -402,13 +616,28 @@ export interface Database {
         };
         Returns: boolean;
       };
-      has_permission_in_organization: {
+      has_organization_membership: {
         Args: {
           organization_id: string;
-          permission: Database["authz"]["Enums"]["permission"];
         };
         Returns: boolean;
       };
+      has_permission_in_organization:
+        | {
+            Args: {
+              organization_id: string;
+              permission: Database["authz"]["Enums"]["permission"];
+            };
+            Returns: boolean;
+          }
+        | {
+            Args: {
+              organization_id: string;
+              permission: Database["authz"]["Enums"]["permission"];
+              strategy: Database["authz"]["Enums"]["strategy"];
+            };
+            Returns: boolean;
+          };
       insert_role_permission: {
         Args: {
           role_slugs: string[];
@@ -449,6 +678,7 @@ export interface Database {
         | "add-group"
         | "edit-group"
         | "select-group";
+      strategy: "jwt" | "db";
     };
     CompositeTypes: {
       permissions_row: {

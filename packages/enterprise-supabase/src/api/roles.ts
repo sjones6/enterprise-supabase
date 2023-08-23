@@ -42,13 +42,13 @@ export class RolesClient implements IRolesClient {
     );
   }
 
-  async getById(groupId: string): Promise<Role> {
+  async getById(roleId: string): Promise<Role> {
     return unwrapPostgrestSingleReponse(
       await this.supabase
         .schema("authz")
         .from("roles")
         .select()
-        .eq("id", groupId)
+        .eq("id", roleId)
         .single()
         .throwOnError()
     );
