@@ -1,21 +1,38 @@
 BEGIN;
 
-select plan(5);
+select plan(8);
 
 SELECT tests.create_supabase_user('test_owner', 'owner@test.com');
 SELECT tests.create_supabase_user('test_member', 'member@test.com');
 
 SELECT tests.authenticate_as('test_owner');
 SELECT authz.create_organization('test org');
+SELECT tests.authenticate_as('test_owner');
+
+SELECT authz.set_active_organization(
+    (SELECT id FROM authz.organizations WHERE name = 'test org')
+);
+
+-- re-establish permissions
+SELECT tests.authenticate_as('test_owner');
 
 -- check owners permissions
 -- for delete
+
+PREPARE has_one_permission_test_db AS
+    SELECT * FROM authz.has_permission_in_organization(
+        (SELECT id FROM authz.organizations WHERE name = 'test org'),
+        'add-member'::authz.permission,
+        'db'::authz.strategy
+    );
+SELECT results_eq('has_one_permission_test_db', ARRAY[true], 'returns true if user has permission in DB');
+
 PREPARE has_one_permission_test AS
     SELECT * FROM authz.has_permission_in_organization(
         (SELECT id FROM authz.organizations WHERE name = 'test org'),
-        'delete-organization'::authz.permission
+        'add-member'::authz.permission
     );
-SELECT results_eq('has_one_permission_test', ARRAY[true], 'returns true if user has permission');
+SELECT results_eq('has_one_permission_test', ARRAY[true], 'returns true if user has permission on JWT');
 
 PREPARE has_all_permission_test AS
     SELECT * FROM authz.has_all_permissions_in_organization(
@@ -29,14 +46,27 @@ PREPARE has_all_permission_test AS
 SELECT results_eq('has_all_permission_test', ARRAY[true], 'returns true if user has all permissions');
 
 
-SELECT authz.add_member_to_organization(
+PREPARE add_member_to_org_verify_members AS SELECT user_id FROM authz.add_member_to_organization(
     (SELECT id FROM authz.organizations WHERE name = 'test org'),
     tests.get_supabase_uid('test_member'),
     (SELECT id FROM authz.roles WHERE slug = 'read-only')
 );
+SELECT results_eq('add_member_to_org_verify_members', ARRAY[
+        tests.get_supabase_uid('test_member')
+    ], 'member is added');
 
-SELECT tests.clear_authentication();
+PREPARE add_member_to_org AS SELECT user_id FROM authz.members m
+    WHERE m.organization_id = (SELECT id FROM authz.organizations WHERE name = 'test org');
+SELECT results_eq('add_member_to_org', ARRAY[
+        tests.get_supabase_uid('test_owner'),
+        tests.get_supabase_uid('test_member')
+    ], 'verify members added');
+    
 
+SELECT tests.authenticate_as('test_member');
+SELECT authz.set_active_organization(
+    (SELECT id FROM authz.organizations WHERE name = 'test org')
+);
 SELECT tests.authenticate_as('test_member');
 
 PREPARE select_user_permissions AS 

@@ -1,6 +1,6 @@
 BEGIN;
 
-select plan(6);
+select plan(5);
 
 SELECT tests.create_supabase_user('test_owner', 'owner@test.com');
 SELECT tests.create_supabase_user('test_admin', 'admin@test.com');
@@ -9,6 +9,7 @@ SELECT tests.create_supabase_user('test_not_member', 'not_member@test.com');
 
 SELECT tests.authenticate_as('test_owner');
 SELECT authz.create_organization('test org');
+SELECT tests.authenticate_as('test_owner');
 
 INSERT INTO authz.groups(organization_id, name) VALUES (
         (SELECT id FROM authz.organizations WHERE name = 'test org'),
@@ -58,10 +59,6 @@ PREPARE set_active_org AS SELECT authz.set_active_organization(
 );
 SELECT results_eq('set_active_org', ARRAY['OK']::text[]);
 
-PREPARE select_primary_organization AS 
-    SELECT is_primary FROM authz.members m 
-    WHERE organization_id = (SELECT id FROM authz.organizations WHERE name = 'test org') AND m.user_id = tests.get_supabase_uid('test_read_only');
-SELECT results_eq('select_primary_organization', ARRAY[true]::boolean[], 'sets primary column');
 
 PREPARE select_user_permissions_with_group_membership AS 
     SELECT permission FROM authz.user_permissions up 

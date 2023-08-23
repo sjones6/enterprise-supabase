@@ -9,6 +9,7 @@ SELECT tests.create_supabase_user('test_not_member', 'not_member@test.com');
 
 SELECT tests.authenticate_as('test_owner');
 SELECT authz.create_organization('test org');
+SELECT tests.authenticate_as('test_owner');
 
 DO $$
 DECLARE

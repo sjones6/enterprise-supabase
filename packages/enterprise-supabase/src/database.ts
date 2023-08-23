@@ -305,18 +305,21 @@ export interface Database {
         Row: {
           created_at: string | null
           organization_id: string
+          permissions_last_updated_at: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
           created_at?: string | null
           organization_id: string
+          permissions_last_updated_at?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
           created_at?: string | null
           organization_id?: string
+          permissions_last_updated_at?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -522,6 +525,7 @@ export interface Database {
         Returns: {
           created_at: string | null
           organization_id: string
+          permissions_last_updated_at: string | null
           updated_at: string | null
           user_id: string
         }
@@ -557,6 +561,7 @@ export interface Database {
         Returns: {
           created_at: string | null
           organization_id: string
+          permissions_last_updated_at: string | null
           updated_at: string | null
           user_id: string
         }[]
@@ -588,13 +593,22 @@ export interface Database {
         }
         Returns: boolean
       }
-      has_any_permission_in_organization: {
-        Args: {
-          organization_id: string
-          permission: Database["authz"]["Enums"]["permission"][]
-        }
-        Returns: boolean
-      }
+      has_any_permission_in_organization:
+        | {
+            Args: {
+              organization_id: string
+              permissions: Database["authz"]["Enums"]["permission"][]
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              organization_id: string
+              permissions: Database["authz"]["Enums"]["permission"][]
+              strategy: Database["authz"]["Enums"]["strategy"]
+            }
+            Returns: boolean
+          }
       has_group_membership: {
         Args: {
           organization_id: string
@@ -602,13 +616,28 @@ export interface Database {
         }
         Returns: boolean
       }
-      has_permission_in_organization: {
+      has_organization_membership: {
         Args: {
           organization_id: string
-          permission: Database["authz"]["Enums"]["permission"]
         }
         Returns: boolean
       }
+      has_permission_in_organization:
+        | {
+            Args: {
+              organization_id: string
+              permission: Database["authz"]["Enums"]["permission"]
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              organization_id: string
+              permission: Database["authz"]["Enums"]["permission"]
+              strategy: Database["authz"]["Enums"]["strategy"]
+            }
+            Returns: boolean
+          }
       insert_role_permission: {
         Args: {
           role_slugs: string[]
@@ -631,20 +660,6 @@ export interface Database {
         }
         Returns: string
       }
-      update_users_permissions:
-        | {
-            Args: {
-              user_id: string
-              organization_id: string
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              user_id: string
-            }
-            Returns: undefined
-          }
     }
     Enums: {
       permission:
@@ -663,6 +678,7 @@ export interface Database {
         | "add-group"
         | "edit-group"
         | "select-group"
+      strategy: "jwt" | "db"
     }
     CompositeTypes: {
       permissions_row: {

@@ -9,6 +9,7 @@ SELECT tests.create_supabase_user('test_not_member', 'not_member@test.com');
 
 SELECT tests.authenticate_as('test_owner');
 SELECT authz.create_organization('test org');
+SELECT tests.authenticate_as('test_owner');
 
 -- System roles
 PREPARE select_roles AS 
@@ -81,6 +82,10 @@ SELECT authz.add_member_to_organization(
 );
 
 SELECT tests.authenticate_as('test_admin');
+SELECT authz.set_active_organization(
+    (SELECT id FROM authz.organizations WHERE name = 'test org')
+);
+SELECT tests.authenticate_as('test_admin');
 
 PREPARE select_user_role_admin AS 
     SELECT slug FROM authz.roles r
@@ -117,6 +122,10 @@ SELECT authz.add_member_to_organization(
     (SELECT id FROM authz.roles WHERE slug = 'read-only')
 );
 
+SELECT tests.authenticate_as('test_read_only');
+SELECT authz.set_active_organization(
+    (SELECT id FROM authz.organizations WHERE name = 'test org')
+);
 SELECT tests.authenticate_as('test_read_only');
 
 PREPARE select_user_role_read_only AS 

@@ -150,7 +150,10 @@ CREATE OR REPLACE FUNCTION tests.authenticate_as (identifier text)
 
 
             perform set_config('role', 'authenticated', true);
-            perform set_config('request.jwt.claims', json_build_object('sub', user_data ->> 'id', 'email', user_data ->> 'email', 'phone', user_data ->> 'phone')::text, true);
+            perform set_config('request.jwt.claims', 
+                json_strip_nulls(json_build_object('sub', user_data ->> 'id', 'email', user_data ->> 'email', 'phone', user_data ->> 'phone', 'app_metadata', user_data -> 'raw_app_meta_data'))::text,
+                true
+            );
 
         EXCEPTION
             -- revert back to original auth data
