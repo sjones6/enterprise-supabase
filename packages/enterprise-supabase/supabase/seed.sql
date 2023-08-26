@@ -89,9 +89,9 @@ BEGIN
         (group_1, org_1, 'Group 1', 'Group associated with first seed org.'),
         (group_2, org_3, 'Group 2', 'Group associated with third seed org.');
 
-    INSERT INTO authz.group_roles (organization_id, group_id, role_id) VALUES
-        (org_1, group_1, read_only_role_id),
-        (org_3, group_2, owner_role_id);
+    INSERT INTO authz.group_roles (organization_id, group_id, role_id, scope) VALUES
+        (org_1, group_1, read_only_role_id, 'organization'::authz.group_role_scope),
+        (org_3, group_2, owner_role_id, 'group'::authz.group_role_scope);
 
     INSERT INTO authz.group_members (organization_id, group_id, user_id) VALUES
         -- Org 1, Group 1

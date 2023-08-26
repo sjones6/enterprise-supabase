@@ -15,41 +15,6 @@ export type CompositeGroupId = [UUID, UUID];
 
 export type UpdateGroup = Pick<Group, "name" | "description">;
 
-export type UpdateGroupRolesAndMembersParams = {
-  organizationId: string;
-  groupId: string;
-
-  /**
-   * Update the group name. Optional.
-   */
-  name?: string;
-
-  /**
-   * Update group description. Optional.
-   */
-  description?: string;
-
-  /**
-   * Role UUIDs for roles to add to the group. Optional.
-   */
-  addRoles?: string[];
-
-  /**
-   * Roles UUIDs for roles to remove from the group. Optional.
-   */
-  removeRoles?: string[];
-
-  /**
-   * Organization member UUIDs (NOT user_ids) to add to the group. Optional.
-   */
-  addMembers?: string[];
-
-  /**
-   * Organization member UUIDs (NOT user_ids) to remove from the group. Optional.
-   */
-  removeMembers?: string[];
-};
-
 export interface IGroupsClient {
   create(group: CreateGroup): Promise<Group>;
   getById(id: CompositeGroupId): Promise<Group>;
@@ -59,9 +24,6 @@ export interface IGroupsClient {
   ): Promise<PaginatedResponse<Group>>;
   updateById(id: CompositeGroupId, group: UpdateGroup): Promise<Group>;
   deleteById(id: CompositeGroupId): Promise<unknown>;
-  updateGroupRolesAndMembers(
-    params: UpdateGroupRolesAndMembersParams
-  ): Promise<boolean>;
 }
 
 export class GroupsClient implements IGroupsClient {
@@ -137,33 +99,6 @@ export class GroupsClient implements IGroupsClient {
         .eq("organization_id", organizationId)
         .eq("id", groupId)
         .single()
-        .throwOnError()
-    );
-  }
-
-  async updateGroupRolesAndMembers({
-    organizationId,
-    groupId,
-    name,
-    description,
-    addMembers,
-    addRoles,
-    removeMembers,
-    removeRoles,
-  }: UpdateGroupRolesAndMembersParams): Promise<boolean> {
-    return unwrapPostgrestSingleReponse(
-      await this.supabase
-        .schema("authz")
-        .rpc("edit_group", {
-          group_id: groupId,
-          organization_id: organizationId,
-          name,
-          description,
-          add_members: addMembers,
-          add_roles: addRoles,
-          remove_members: removeMembers,
-          remove_roles: removeRoles,
-        })
         .throwOnError()
     );
   }

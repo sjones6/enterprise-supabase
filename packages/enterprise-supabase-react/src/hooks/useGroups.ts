@@ -6,7 +6,6 @@ import {
   PaginatedResponse,
   Pagination,
   UpdateGroup,
-  UpdateGroupRolesAndMembersParams,
 } from "enterprise-supabase";
 import {
   useMutation,
@@ -73,39 +72,6 @@ export const useDeleteGroup = (
         options.onSuccess && options.onSuccess(data, ctx, vars);
       },
       retry: false,
-    }
-  );
-};
-
-export const useUpdateGroupRolesAndMembers = (
-  options: UseMutationOptions<
-    boolean,
-    PostgrestError,
-    Omit<UpdateGroupRolesAndMembersParams, "organizationId">
-  > = {}
-) => {
-  const queryClient = useQueryClient();
-  const { groups } = useEnterpriseSupabaseApiClient();
-  const { primaryOrganization } = useOrganizationContext();
-  return useMutation(
-    (params) => {
-      if (!primaryOrganization) {
-        throw new Error("missing primary organization");
-      }
-      return groups.updateGroupRolesAndMembers({
-        ...params,
-        organizationId: primaryOrganization.id,
-      });
-    },
-    {
-      onSuccess(data, ctx, vars) {
-        queryClient.invalidateQueries({
-          queryKey: ["enterprise", primaryOrganization?.id, "groups"],
-        });
-        options.onSuccess && options.onSuccess(data, ctx, vars);
-      },
-      retry: false,
-      ...options,
     }
   );
 };

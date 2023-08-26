@@ -19,7 +19,6 @@ export type {
   CompositeGroupId,
   CreateGroup,
   UpdateGroup,
-  UpdateGroupRolesAndMembersParams,
   IGroupsClient,
 } from "./groups";
 
