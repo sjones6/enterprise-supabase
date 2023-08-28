@@ -64,6 +64,7 @@ export interface Database {
           group_id: string;
           organization_id: string;
           role_id: string;
+          scope: Database["authz"]["Enums"]["group_role_scope"];
           updated_at: string | null;
         };
         Insert: {
@@ -71,6 +72,7 @@ export interface Database {
           group_id: string;
           organization_id: string;
           role_id: string;
+          scope?: Database["authz"]["Enums"]["group_role_scope"];
           updated_at?: string | null;
         };
         Update: {
@@ -78,6 +80,7 @@ export interface Database {
           group_id?: string;
           organization_id?: string;
           role_id?: string;
+          scope?: Database["authz"]["Enums"]["group_role_scope"];
           updated_at?: string | null;
         };
         Relationships: [
@@ -541,19 +544,6 @@ export interface Database {
           updated_at: string | null;
         };
       };
-      edit_group: {
-        Args: {
-          group_id: string;
-          organization_id: string;
-          name?: string;
-          description?: string;
-          add_members?: string[];
-          remove_members?: string[];
-          add_roles?: string[];
-          remove_roles?: string[];
-        };
-        Returns: boolean;
-      };
       get_members_for_roles: {
         Args: {
           role_ids: string[];
@@ -572,6 +562,14 @@ export interface Database {
         };
         Returns: Database["authz"]["Enums"]["permission"][];
       };
+      get_permissions_for_group: {
+        Args: {
+          organization_id: string;
+          group_id: string;
+          user_id: string;
+        };
+        Returns: Database["authz"]["CompositeTypes"]["permissions_row"][];
+      };
       get_permissions_in_organization:
         | {
             Args: {
@@ -586,13 +584,54 @@ export interface Database {
             };
             Returns: Database["authz"]["CompositeTypes"]["permissions_row"][];
           };
-      has_all_permissions_in_organization: {
-        Args: {
-          organization_id: string;
-          permissions: Database["authz"]["Enums"]["permission"][];
-        };
-        Returns: boolean;
-      };
+      has_all_permissions_in_group:
+        | {
+            Args: {
+              group_id: string;
+              permissions: Database["authz"]["Enums"]["permission"][];
+            };
+            Returns: boolean;
+          }
+        | {
+            Args: {
+              group_id: string;
+              permissions: Database["authz"]["Enums"]["permission"][];
+              strategy: Database["authz"]["Enums"]["strategy"];
+            };
+            Returns: boolean;
+          };
+      has_all_permissions_in_organization:
+        | {
+            Args: {
+              organization_id: string;
+              permissions: Database["authz"]["Enums"]["permission"][];
+              strategy: Database["authz"]["Enums"]["strategy"];
+            };
+            Returns: boolean;
+          }
+        | {
+            Args: {
+              organization_id: string;
+              permissions: Database["authz"]["Enums"]["permission"][];
+            };
+            Returns: boolean;
+          };
+      has_any_permission_in_group:
+        | {
+            Args: {
+              group_id: string;
+              permissions: Database["authz"]["Enums"]["permission"][];
+            };
+            Returns: boolean;
+          }
+        | {
+            Args: {
+              group_id: string;
+              permissions: Database["authz"]["Enums"]["permission"][];
+              strategy: Database["authz"]["Enums"]["strategy"];
+            };
+            Returns: boolean;
+          };
       has_any_permission_in_organization:
         | {
             Args: {
@@ -609,19 +648,42 @@ export interface Database {
             };
             Returns: boolean;
           };
-      has_group_membership: {
-        Args: {
-          organization_id: string;
-          group_id: string;
-        };
-        Returns: boolean;
-      };
+      has_group_membership:
+        | {
+            Args: {
+              group_id: string;
+            };
+            Returns: boolean;
+          }
+        | {
+            Args: {
+              organization_id: string;
+              group_id: string;
+            };
+            Returns: boolean;
+          };
       has_organization_membership: {
         Args: {
           organization_id: string;
         };
         Returns: boolean;
       };
+      has_permission_in_group:
+        | {
+            Args: {
+              group_id: string;
+              permission: Database["authz"]["Enums"]["permission"];
+            };
+            Returns: boolean;
+          }
+        | {
+            Args: {
+              group_id: string;
+              permission: Database["authz"]["Enums"]["permission"];
+              strategy: Database["authz"]["Enums"]["strategy"];
+            };
+            Returns: boolean;
+          };
       has_permission_in_organization:
         | {
             Args: {
@@ -662,6 +724,7 @@ export interface Database {
       };
     };
     Enums: {
+      group_role_scope: "organization" | "group";
       permission:
         | "delete-organization"
         | "edit-organization"

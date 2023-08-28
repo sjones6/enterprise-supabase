@@ -40,17 +40,26 @@ SELECT authz.set_active_organization(
 
 -- Edit group to add role and member
 SELECT tests.authenticate_as('test_owner');
-PREPARE edit_group AS SELECT authz.edit_group(
-    (SELECT id FROM authz.groups WHERE name = 'test group'),
-    (SELECT id FROM authz.organizations WHERE name = 'test org'), 
-    NULL, -- name 
-    NULL, -- description
 
-    ARRAY[tests.get_supabase_uid('test_read_only')]::uuid[], -- Add members
-    ARRAY[]::uuid[], -- Remove members
-    ARRAY(SELECT id FROM authz.roles WHERE slug = 'admin') -- Add roles
+INSERT INTO authz.group_members ( organization_id, group_id, user_id ) VALUES (
+    (SELECT id FROM authz.organizations WHERE name = 'test org'),
+    (SELECT id FROM authz.groups WHERE name = 'test group'),
+    tests.get_supabase_uid('test_read_only')
 );
-SELECT results_eq('edit_group', ARRAY[true], 'edit group succeeds');
+
+INSERT INTO authz.group_roles ( organization_id, group_id, role_id, scope ) VALUES (
+    (SELECT id FROM authz.organizations WHERE name = 'test org'),
+    (SELECT id FROM authz.groups WHERE name = 'test group'),
+    (SELECT id FROM authz.roles WHERE slug = 'admin'),
+    'organization'::authz.group_role_scope
+);
+
+INSERT INTO authz.group_roles ( organization_id, group_id, role_id, scope ) VALUES (
+    (SELECT id FROM authz.organizations WHERE name = 'test org'),
+    (SELECT id FROM authz.groups WHERE name = 'test group'),
+    (SELECT id FROM authz.roles WHERE slug = 'admin'),
+    'group'::authz.group_role_scope
+);
 
 -- User should now have admin permissions based on group membership
 SELECT tests.authenticate_as('test_read_only'); 
@@ -83,6 +92,17 @@ SELECT results_eq('select_user_permissions_with_group_membership', ARRAY[
 PREPARE select_user_permissions_for_jwt AS (SELECT (tests.get_supabase_user('test_read_only')->'raw_app_meta_data'->'organization_permissions')::text);
 SELECT results_eq(
     'select_user_permissions_for_jwt',
+    ARRAY[
+        '["edit-organization", "select-organization", "delete-member", "add-member", "edit-member", "select-member", "delete-role", "add-role", "edit-role", "select-role", "delete-group", "add-group", "edit-group", "select-group"]'
+    ]::text[], 'permissions placed on JWT'
+);
+
+PREPARE select_user_permissions_for_group_on_jwt AS (
+    SELECT (tests.get_supabase_user('test_read_only')->'raw_app_meta_data'->'group_permissions'->(
+        SELECT id::text FROM authz.groups WHERE name = 'test group'
+    ))::text);
+SELECT results_eq(
+    'select_user_permissions_for_group_on_jwt',
     ARRAY[
         '["edit-organization", "select-organization", "delete-member", "add-member", "edit-member", "select-member", "delete-role", "add-role", "edit-role", "select-role", "delete-group", "add-group", "edit-group", "select-group"]'
     ]::text[], 'permissions placed on JWT'

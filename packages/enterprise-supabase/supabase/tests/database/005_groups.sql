@@ -32,17 +32,21 @@ BEGIN
         (SELECT id FROM authz.roles WHERE slug = 'read-only')
    );
 
-   INSERT INTO authz.groups(organization_id, name) VALUES (
+   INSERT INTO authz.groups(id, organization_id, name) VALUES (
+        group_id,
         organization_id,
         'test group'
    );
 
-    SELECT id INTO group_id FROM authz.groups WHERE name = 'test group';
-
-   PERFORM authz.edit_group(group_id, organization_id, 'test-group', '', ARRAY[
-    tests.get_supabase_uid('test_read_only'),
-    tests.get_supabase_uid('test_admin')
-   ]::uuid[]);
+   INSERT INTO authz.group_members ( organization_id, group_id, user_id ) VALUES (
+        organization_id,
+        group_id,
+        tests.get_supabase_uid('test_read_only')
+   ), (
+        organization_id,
+        group_id,
+        tests.get_supabase_uid('test_admin')
+   );
 END$$;
 
 SELECT tests.authenticate_as('test_admin');
